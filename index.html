@@ -53,6 +53,7 @@
   .sigbox.assinado .sigph{display:none}
   .sigclear{color:#fff;font-size:13px;font-weight:600;padding:8px 2px;opacity:.85;text-decoration:underline}
   button:disabled{opacity:.6}
+  .aviso-sit{background:var(--orange-bg);color:#6b3c00;border-radius:14px;padding:12px 14px;font-size:14px;margin-top:16px;line-height:1.4} .aviso-sit.bloq{background:var(--red-bg);color:#9b2c2c} .aviso-sit a{color:var(--green-d);font-weight:700}
   .sync{text-align:center;color:var(--muted);font-size:12.5px;margin-top:22px}
   .sync b{font-weight:600}
   .lerr{color:#ffe0e0;background:rgba(214,69,69,.25);border-radius:10px;padding:0;font-size:14px;margin-top:12px}
@@ -295,6 +296,16 @@
     <div class="lerr" id="senhaErr"></div>
   </form>
 
+  <form id="codForm" class="lform hidden" novalidate>
+    <h1>Confirme seu e-mail</h1>
+    <p class="lead" id="codLead">Enviamos um código de 6 números para o seu e-mail corporativo.</p>
+    <label class="lfield"><span>Código recebido</span><input id="codInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" placeholder="000000"></label>
+    <button class="btn-white" type="submit" id="codBtn">Confirmar</button>
+    <button class="btn-outline" type="button" id="codReenviar">Reenviar código</button>
+    <button class="btn-link" type="button" id="codPular">Agora não</button>
+    <div class="lerr" id="codErr"></div>
+  </form>
+
   <form id="recForm" class="lform hidden" novalidate>
     <h1>Recuperar senha</h1>
     <p class="lead">Vamos enviar uma senha provisória de 6 números para o e-mail cadastrado neste CPF. Ao entrar com ela, você cria a sua nova senha.</p>
@@ -326,7 +337,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '12';
+const VERSAO = '13';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -518,9 +529,45 @@ $('#cadForm').addEventListener('submit', async e => {
   const users = lsGet(K_USERS, []);
   if (users.some(u => u.cpf === cpf)) return err('Este CPF já tem cadastro neste aparelho. Volte e faça o login.');
   const u = { cpf, nome, email, assinatura: pads.cSig.png(), hash: await hash(cpf + ':' + p1), criadoEm: new Date().toISOString() };
-  users.push(u); if (!lsSet(K_USERS, users)) return;
-  toast('Cadastro criado!');
-  entrar(u);
+  if (!GOOGLE.url) { users.push(u); if (!lsSet(K_USERS, users)) return; toast('Cadastro criado!'); return entrar(u); }
+  if (!navigator.onLine) return err('Conecte-se à internet para concluir o primeiro acesso (enviamos um código para o seu e-mail).');
+  iniciarConfirmacao(u, false);
+});
+
+// ---- Código de confirmação por e-mail (primeiro acesso e cadastros antigos) ----
+let confirmacao = null; // { u, existente }
+async function enviarCodigo(){
+  const b = $('#codReenviar'); b.disabled = true;
+  try { await google('cadastroCodigo', { cpf: confirmacao.u.cpf, nome: confirmacao.u.nome, email: confirmacao.u.email }, {});
+    const [a, dom] = confirmacao.u.email.split('@'); $('#codLead').textContent = `Enviamos um código de 6 números para ${a.slice(0, 2)}***@${dom}. Ele vale por 15 minutos.`; $('#codErr').textContent = ''; }
+  catch (e) { $('#codErr').textContent = e.message === 'Failed to fetch' ? 'Sem conexão. Tente de novo.' : e.message; }
+  b.disabled = false;
+}
+function iniciarConfirmacao(u, existente){
+  confirmacao = { u, existente };
+  if (existente && sessao) { $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); }
+  mostrarForm('codForm'); $('#codInput').value = '';
+  $('#codPular').classList.toggle('hidden', !existente);
+  enviarCodigo(); setTimeout(() => $('#codInput').focus(), 100);
+}
+$('#codInput').addEventListener('input', e => e.target.value = digits(e.target.value).slice(0, 6));
+$('#codReenviar').onclick = enviarCodigo;
+$('#codPular').onclick = () => { const u = confirmacao.u; confirmacao = null; sessao ? start() : entrar(u); };
+$('#codForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const codigo = $('#codInput').value, err = m => $('#codErr').textContent = m;
+  if (codigo.length !== 6) return err('Digite os 6 números do código.');
+  const b = $('#codBtn'); b.disabled = true; b.textContent = 'Confirmando…';
+  try {
+    const r = await google('cadastroConfirmar', { cpf: confirmacao.u.cpf, codigo }, {});
+    const users = lsGet(K_USERS, []); let u = users.find(x => x.cpf === confirmacao.u.cpf);
+    if (!u) { u = confirmacao.u; users.push(u); }
+    u.token = r.token; u.situacao = r.situacao; lsSet(K_USERS, users);
+    const novo = !confirmacao.existente; confirmacao = null;
+    toast(novo ? 'E-mail confirmado! Cadastro criado.' : 'E-mail confirmado!');
+    if (sessao) start(); else entrar(u);
+  } catch (x) { err(x.message === 'Failed to fetch' ? 'Sem conexão. Tente de novo.' : x.message); }
+  b.disabled = false; b.textContent = 'Confirmar';
 });
 
 // Cadastros antigos (sem e-mail ou assinatura) completam os dados no próximo login
@@ -530,6 +577,7 @@ function posLogin(u){
   usuarioPendente = u;
   if (u.senhaProvisoria) { mostrarForm('senhaForm'); setTimeout(() => $('#nPass').focus(), 50); return; }
   if (!u.email || !u.assinatura) { mostrarForm('perfilForm'); $('#pEmail').value = u.email || ''; return; }
+  if (GOOGLE.url && !u.token && navigator.onLine) return iniciarConfirmacao(u, true); // cadastro antigo: confirma o e-mail uma vez
   entrar(u);
 }
 $('#senhaForm').addEventListener('submit', async e => {
@@ -595,7 +643,7 @@ function start(){
   loadClientes();
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   route();
-  buscarMeta(); sincronizar();
+  buscarMeta(); sincronizar(); consultarSituacao();
 }
 
 /* =========================================================
@@ -691,6 +739,7 @@ function viewHome(){
         <div class="n">${contratosMes().length}</div><span class="chev">${I.chev}</span>
       </button>
     </div>
+    ${avisoSituacao()}
     <p class="sync" id="syncInfo">${syncTexto()}</p>
     <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:6px">Versão ${VERSAO}</p>`;
 }
@@ -1562,11 +1611,30 @@ function viewRealizadas(){
    O app compara o que tem no celular com o que já foi enviado
    e manda só o que mudou. Sem internet, tenta de novo depois.
    ========================================================= */
-async function google(acao, dados){
-  const r = await fetch(GOOGLE.url, { method: 'POST', body: JSON.stringify({ chave: GOOGLE.chave, acao, dados }) }); // text/plain: sem preflight
+async function google(acao, dados, auth){
+  const u = auth || (sessao ? usuarioAtual() : {});
+  const r = await fetch(GOOGLE.url, { method: 'POST', body: JSON.stringify({ chave: GOOGLE.chave, acao, dados, cpf: u.cpf || '', token: u.token || '' }) }); // text/plain: sem preflight
   const j = await r.json();
-  if (!j.ok) throw new Error(j.erro || 'Erro no Google');
+  if (!j.ok) { const e = new Error(j.erro || 'Erro no Google'); e.codigo = j.codigo || ''; throw e; }
   return j;
+}
+// Situação do vendedor no Google: Aprovado / Pendente / Bloqueado / confirmar (e-mail não confirmado)
+function atualizarSituacao(sit){
+  const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === (sessao && sessao.cpf)); if (!u || !sit || u.situacao === sit) return;
+  u.situacao = sit; lsSet(K_USERS, users); if (location.hash.replace('#', '') === '') viewHome();
+}
+async function consultarSituacao(){
+  if (!GOOGLE.url || !sessao || !navigator.onLine) return;
+  const u = usuarioAtual(); if (!u.token) return atualizarSituacao('confirmar');
+  try { const r = await google('situacao', {}); atualizarSituacao(r.situacao); } catch (e) {}
+}
+function avisoSituacao(){
+  if (!GOOGLE.url) return '';
+  const sit = usuarioAtual().situacao;
+  if (sit === 'Pendente') return `<div class="aviso-sit">⏳ <b>Cadastro aguardando aprovação do gestor.</b> Você já pode trabalhar normalmente: tudo fica guardado no celular e é enviado para a planilha assim que o gestor aprovar.</div>`;
+  if (sit === 'Bloqueado') return `<div class="aviso-sit bloq">⛔ <b>Seu acesso foi bloqueado pelo gestor.</b> Os dados não estão sendo enviados. Fale com o seu gestor.</div>`;
+  if (sit === 'confirmar') return `<div class="aviso-sit">✉ <b>Confirme o seu e-mail</b> para enviar os dados para a planilha. <a href="#" onclick="iniciarConfirmacao(usuarioAtual(), true);return false">Confirmar agora</a></div>`;
+  return '';
 }
 const kSinc = () => 'cv_sinc_' + sessao.cpf;
 const hashStr = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); };
@@ -1586,6 +1654,9 @@ function syncTexto(){
   if (!GOOGLE.url) return 'Planilha do Google ainda não conectada';
   const n = pendentesSinc();
   if (sincRodando) return '⟳ Enviando dados para a planilha…';
+  const sit = usuarioAtual().situacao;
+  if (n && sit === 'Pendente') return `<b>${n}</b> item(ns) guardado(s) · serão enviados após a aprovação do gestor`;
+  if (n && (sit === 'Bloqueado' || sit === 'confirmar')) return `<b>${n}</b> item(ns) guardado(s) no celular · envio parado`;
   if (!n) return '✓ Tudo enviado para a planilha';
   return `<b>${n}</b> ${n > 1 ? 'itens aguardando' : 'item aguardando'} envio${!navigator.onLine ? ' (sem internet)' : sincErro ? ' (vamos tentar de novo)' : ''}`;
 }
@@ -1616,9 +1687,13 @@ async function sincronizar(){
       if (vivas.has(fid)) continue;
       await google('removerFoto', { fotoId: fid }); delete st.fotos[fid]; salvar();
     }
-  } catch (e) { sincErro = e.message || 'erro'; }
+  } catch (e) {
+    sincErro = e.message || 'erro';
+    if (e.codigo === 'pendente') atualizarSituacao('Pendente'); else if (e.codigo === 'bloqueado') atualizarSituacao('Bloqueado'); else if (e.codigo === 'confirmar') atualizarSituacao('confirmar');
+  }
+  if (!sincErro) atualizarSituacao('Aprovado');
   sincRodando = false; atualizarSyncInfo();
-  if (sincErro) { clearTimeout(sincTimer); sincTimer = setTimeout(sincronizar, 60000); }
+  if (sincErro) { clearTimeout(sincTimer); sincTimer = setTimeout(sincronizar, usuarioAtual().situacao && usuarioAtual().situacao !== 'Aprovado' ? 300000 : 60000); } // aguardando aprovação: tenta a cada 5 min
 }
 async function buscarMeta(){
   if (!GOOGLE.url || !sessao || !navigator.onLine) return;
