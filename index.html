@@ -321,7 +321,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '10';
+const VERSAO = '11';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -1590,7 +1590,16 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { si
    INÍCIO
    ========================================================= */
 if (sessao) start(); else $('#login').classList.remove('hidden');
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+// Atualização automática: procura versão nova ao abrir/voltar ao app e recarrega sozinho quando ela chega
+if ('serviceWorker' in navigator) window.addEventListener('load', () => {
+  const tinhaVersao = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    reg.update();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
+  }).catch(() => {});
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaVersao && !recarregou) { recarregou = true; location.reload(); } });
+});
 </script>
 </body>
 </html>
