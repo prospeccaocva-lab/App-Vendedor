@@ -44,6 +44,15 @@
   .btn-white{width:100%;padding:15px;border-radius:12px;background:#fff;color:var(--green-d);font-weight:700;font-size:16px;margin-top:6px}
   .btn-outline{width:100%;padding:14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.7);color:#fff;font-weight:600;margin-top:12px}
   .aviso{background:rgba(175,203,9,.2);border:1px solid rgba(175,203,9,.6);border-radius:12px;padding:10px 12px;font-size:14px;margin:-10px 0 18px}
+  .btn-link{display:block;width:100%;padding:14px;margin-top:6px;color:#fff;font-weight:600;text-decoration:underline;text-underline-offset:3px;opacity:.9}
+  .lfield small{opacity:.75;font-weight:400}
+  .sigbox{position:relative;background:#fff;border-radius:12px;height:160px;overflow:hidden;border:2px solid transparent}
+  .sigbox canvas{width:100%;height:100%;display:block;touch-action:none}
+  .sigbox::after{content:'';position:absolute;left:18px;right:18px;bottom:36px;border-bottom:1.5px dashed #c5cec2;pointer-events:none}
+  .sigph{position:absolute;left:0;right:0;bottom:12px;text-align:center;color:#9aa696;font-size:13px;font-style:normal;pointer-events:none}
+  .sigbox.assinado .sigph{display:none}
+  .sigclear{color:#fff;font-size:13px;font-weight:600;padding:8px 2px;opacity:.85;text-decoration:underline}
+  button:disabled{opacity:.6}
   .lerr{color:#ffe0e0;background:rgba(214,69,69,.25);border-radius:10px;padding:0;font-size:14px;margin-top:12px}
   .lerr:not(:empty){padding:10px 12px}
 
@@ -211,31 +220,59 @@
 </head>
 <body>
 
-<!-- ================= LOGIN / PRIMEIRO ACESSO ================= -->
+<!-- ================= LOGIN / PRIMEIRO ACESSO / RECUPERAR SENHA ================= -->
 <section id="login" class="hidden">
   <img class="brand" src="logo.svg" alt="Cheiro Verde Ambiental">
 
-  <form id="loginForm" autocomplete="on" novalidate>
+  <form id="loginForm" class="lform" autocomplete="on" novalidate>
     <h1>Área do Vendedor</h1>
     <p class="lead">Entre para acompanhar suas visitas e contratos.</p>
     <label class="lfield"><span>CPF</span><input id="lCpf" name="username" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14"></label>
     <label class="lfield"><span>Senha</span><input id="lPass" name="password" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
     <button class="btn-white" type="submit">Entrar</button>
     <button class="btn-outline" type="button" id="goCadastro">Primeiro acesso</button>
+    <button class="btn-link" type="button" id="goRecuperar">Recuperar senha</button>
     <div class="lerr" id="loginErr"></div>
   </form>
 
-  <form id="cadForm" class="hidden" autocomplete="on" novalidate>
+  <form id="cadForm" class="lform hidden" autocomplete="on" novalidate>
     <h1>Primeiro acesso</h1>
     <p class="lead">Crie seu cadastro para usar o aplicativo.</p>
     <div id="cadAviso" class="aviso hidden">Este CPF ainda não tem cadastro. Complete os dados abaixo para criar seu acesso.</div>
     <label class="lfield"><span>Nome completo</span><input id="cNome" autocomplete="name" placeholder="Seu nome completo"></label>
     <label class="lfield"><span>CPF</span><input id="cCpf" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14"></label>
+    <label class="lfield"><span>E-mail corporativo</span><input id="cEmail" type="email" inputmode="email" autocomplete="email" placeholder="nome@cheiroverdeambiental.com.br"></label>
     <label class="lfield"><span>Senha</span><input id="cPass" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres"></label>
     <label class="lfield"><span>Repetir senha</span><input id="cPass2" type="password" autocomplete="new-password" placeholder="Digite a senha novamente"></label>
+    <div class="lfield"><span>Assinatura <small>(vai nas propostas em PDF)</small></span>
+      <div class="sigbox"><canvas id="cSig"></canvas><em class="sigph">Assine aqui com o dedo</em></div>
+      <button type="button" class="sigclear" data-limpar="cSig">Limpar assinatura</button>
+    </div>
     <button class="btn-white" type="submit">Criar cadastro</button>
-    <button class="btn-outline" type="button" id="goLogin">Já tenho cadastro</button>
+    <button class="btn-outline" type="button" data-voltar>Já tenho cadastro</button>
     <div class="lerr" id="cadErr"></div>
+  </form>
+
+  <form id="perfilForm" class="lform hidden" novalidate>
+    <h1>Complete seu cadastro</h1>
+    <p class="lead">Precisamos do seu e-mail corporativo e da sua assinatura para gerar as propostas.</p>
+    <label class="lfield"><span>E-mail corporativo</span><input id="pEmail" type="email" inputmode="email" autocomplete="email" placeholder="nome@cheiroverdeambiental.com.br"></label>
+    <div class="lfield"><span>Assinatura</span>
+      <div class="sigbox"><canvas id="pSig"></canvas><em class="sigph">Assine aqui com o dedo</em></div>
+      <button type="button" class="sigclear" data-limpar="pSig">Limpar assinatura</button>
+    </div>
+    <button class="btn-white" type="submit">Salvar e entrar</button>
+    <div class="lerr" id="perfilErr"></div>
+  </form>
+
+  <form id="recForm" class="lform hidden" novalidate>
+    <h1>Recuperar senha</h1>
+    <p class="lead">Vamos enviar uma nova senha de 6 números para o e-mail cadastrado neste CPF.</p>
+    <label class="lfield"><span>CPF</span><input id="rCpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14"></label>
+    <button class="btn-white" type="submit" id="recBtn">Enviar nova senha</button>
+    <button class="btn-outline" type="button" data-voltar>Voltar ao login</button>
+    <div class="lerr" id="recErr"></div>
+    <div class="aviso hidden" id="recOk" style="margin:14px 0 0"></div>
   </form>
 </section>
 
@@ -254,6 +291,7 @@
 <input type="file" id="fileGaleria" accept="image/*" class="hidden">
 <div class="toast" id="toast"></div>
 
+<script src="lib/jspdf.umd.min.js"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÕES
@@ -261,7 +299,11 @@
 // Meta mensal de contratos. PROVISÓRIO: quando o dashboard do gestor
 // estiver pronto, este valor virá de lá. Use null para "meta não definida".
 const META_MENSAL = 10;
-const VERSAO = '3';
+const VERSAO = '4';
+
+// Envio de e-mail da recuperação de senha (EmailJS – www.emailjs.com).
+// Preencha com os dados da sua conta EmailJS. Enquanto estiver vazio, a recuperação avisa que não está configurada.
+const EMAILJS = { serviceId: '', templateId: '', publicKey: '' };
 
 /* =========================================================
    ARMAZENAMENTO
@@ -358,47 +400,132 @@ const I = {
 };
 
 /* =========================================================
-   LOGIN E PRIMEIRO ACESSO
+   LOGIN, PRIMEIRO ACESSO, ASSINATURA E RECUPERAR SENHA
    ========================================================= */
-['#lCpf', '#cCpf'].forEach(s => $(s).addEventListener('input', e => e.target.value = maskCPF(e.target.value)));
-$('#goCadastro').onclick = () => { $('#loginForm').classList.add('hidden'); $('#cadForm').classList.remove('hidden'); $('#cadErr').textContent = ''; $('#cadAviso').classList.add('hidden'); };
+const DOMINIO = '@cheiroverdeambiental.com.br';
+const emailCorporativo = v => new RegExp('^[^\\s@]+' + DOMINIO.replace(/\./g, '\\.') + '$', 'i').test(String(v).trim());
+['#lCpf', '#cCpf', '#rCpf'].forEach(s => $(s).addEventListener('input', e => e.target.value = maskCPF(e.target.value)));
+
+// ---- Campo de assinatura (dedo ou caneta) ----
+function criarPad(canvas){
+  const ctx = canvas.getContext('2d'); let tracos = 0, desenhando = false, box = null, ultimo = null;
+  const ajustar = () => { const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    if (!r.width) return; canvas.width = r.width * d; canvas.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0);
+    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1c2f6e'; tracos = 0; box = null;
+    canvas.parentElement.classList.remove('assinado'); };
+  const pt = e => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const marca = ([x, y]) => { box = box ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)] : [x, y, x, y]; };
+  canvas.addEventListener('pointerdown', e => { e.preventDefault(); canvas.setPointerCapture(e.pointerId); desenhando = true; ultimo = pt(e); marca(ultimo);
+    ctx.beginPath(); ctx.moveTo(...ultimo); ctx.lineTo(ultimo[0] + .1, ultimo[1] + .1); ctx.stroke(); tracos++; canvas.parentElement.classList.add('assinado'); });
+  canvas.addEventListener('pointermove', e => { if (!desenhando) return; e.preventDefault(); const p = pt(e);
+    ctx.beginPath(); ctx.moveTo(...ultimo); ctx.lineTo(...p); ctx.stroke(); ultimo = p; marca(p); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => canvas.addEventListener(t, () => desenhando = false));
+  return {
+    ajustar, limpar: ajustar,
+    vazia: () => tracos === 0 || !box || (box[2] - box[0] < 20 && box[3] - box[1] < 20),
+    png(){ // recorta só a área assinada, com fundo transparente
+      const d = window.devicePixelRatio || 1, m = 8;
+      const x = Math.max(0, (box[0] - m) * d), y = Math.max(0, (box[1] - m) * d);
+      const w = Math.min(canvas.width - x, (box[2] - box[0] + 2 * m) * d), h = Math.min(canvas.height - y, (box[3] - box[1] + 2 * m) * d);
+      const out = document.createElement('canvas'); out.width = w; out.height = h;
+      out.getContext('2d').drawImage(canvas, x, y, w, h, 0, 0, w, h); return out.toDataURL('image/png');
+    }
+  };
+}
+const pads = { cSig: criarPad($('#cSig')), pSig: criarPad($('#pSig')) };
+document.querySelectorAll('[data-limpar]').forEach(b => b.onclick = () => pads[b.dataset.limpar].limpar());
+
+// ---- Troca de telas do login ----
+function mostrarForm(id){
+  document.querySelectorAll('.lform').forEach(f => f.classList.toggle('hidden', f.id !== id));
+  document.querySelectorAll('.lerr').forEach(e => e.textContent = '');
+  if (id === 'cadForm') pads.cSig.ajustar();
+  if (id === 'perfilForm') pads.pSig.ajustar();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('[data-voltar]').forEach(b => b.onclick = () => mostrarForm('loginForm'));
+$('#goCadastro').onclick = () => { mostrarForm('cadForm'); $('#cadAviso').classList.add('hidden'); };
+$('#goRecuperar').onclick = () => { mostrarForm('recForm'); $('#rCpf').value = $('#lCpf').value; $('#recOk').classList.add('hidden'); };
+
 // CPF completo e ainda sem cadastro: ao sair do campo, leva direto para o Primeiro acesso
 $('#lCpf').addEventListener('change', irParaCadastroSeNovo);
 $('#lCpf').addEventListener('blur', irParaCadastroSeNovo);
 function irParaCadastroSeNovo(){
   const cpf = digits($('#lCpf').value);
+  if ($('#loginForm').classList.contains('hidden')) return;
   if (cpf.length !== 11 || lsGet(K_USERS, []).some(u => u.cpf === cpf)) return;
   if (!validCPF(cpf)) { $('#loginErr').textContent = 'CPF inválido. Confira os números.'; return; }
-  $('#loginErr').textContent = '';
-  $('#loginForm').classList.add('hidden'); $('#cadForm').classList.remove('hidden');
-  $('#cCpf').value = maskCPF(cpf); $('#cadErr').textContent = '';
-  $('#cadAviso').classList.remove('hidden');
+  mostrarForm('cadForm');
+  $('#cCpf').value = maskCPF(cpf); $('#cadAviso').classList.remove('hidden');
   setTimeout(() => $('#cNome').focus(), 50);
 }
-$('#goLogin').onclick = () => { $('#cadForm').classList.add('hidden'); $('#loginForm').classList.remove('hidden'); };
 
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const cpf = digits($('#lCpf').value), pass = $('#lPass').value;
   const u = lsGet(K_USERS, []).find(x => x.cpf === cpf);
   if (!u || u.hash !== await hash(cpf + ':' + pass)) { $('#loginErr').textContent = 'CPF ou senha inválidos. Se é seu primeiro acesso, toque em "Primeiro acesso".'; return; }
+  if (!u.email || !u.assinatura) { usuarioPendente = u; mostrarForm('perfilForm'); $('#pEmail').value = u.email || ''; return; }
   entrar(u);
 });
 
 $('#cadForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const nome = $('#cNome').value.trim().replace(/\s+/g, ' '), cpf = digits($('#cCpf').value), p1 = $('#cPass').value, p2 = $('#cPass2').value;
+  const nome = $('#cNome').value.trim().replace(/\s+/g, ' '), cpf = digits($('#cCpf').value), email = $('#cEmail').value.trim().toLowerCase();
+  const p1 = $('#cPass').value, p2 = $('#cPass2').value;
   const err = m => $('#cadErr').textContent = m;
   if (nome.split(' ').length < 2) return err('Informe seu nome completo (nome e sobrenome).');
   if (!validCPF(cpf)) return err('CPF inválido. Confira os números.');
+  if (!emailCorporativo(email)) return err('Use o seu e-mail corporativo, terminado em ' + DOMINIO + '.');
   if (p1.length < 6) return err('A senha precisa ter pelo menos 6 caracteres.');
   if (p1 !== p2) return err('As senhas não são iguais.');
+  if (pads.cSig.vazia()) return err('Faça a sua assinatura no quadro.');
   const users = lsGet(K_USERS, []);
   if (users.some(u => u.cpf === cpf)) return err('Este CPF já tem cadastro neste aparelho. Volte e faça o login.');
-  const u = { cpf, nome, hash: await hash(cpf + ':' + p1), criadoEm: new Date().toISOString() };
-  users.push(u); lsSet(K_USERS, users);
+  const u = { cpf, nome, email, assinatura: pads.cSig.png(), hash: await hash(cpf + ':' + p1), criadoEm: new Date().toISOString() };
+  users.push(u); if (!lsSet(K_USERS, users)) return;
   toast('Cadastro criado!');
   entrar(u);
+});
+
+// Cadastros antigos (sem e-mail ou assinatura) completam os dados no próximo login
+let usuarioPendente = null;
+$('#perfilForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = $('#pEmail').value.trim().toLowerCase(), err = m => $('#perfilErr').textContent = m;
+  if (!emailCorporativo(email)) return err('Use o seu e-mail corporativo, terminado em ' + DOMINIO + '.');
+  if (pads.pSig.vazia()) return err('Faça a sua assinatura no quadro.');
+  const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === usuarioPendente.cpf);
+  u.email = email; u.assinatura = pads.pSig.png(); lsSet(K_USERS, users);
+  entrar(u);
+});
+
+// ---- Recuperar senha: gera 6 números e envia por e-mail (EmailJS) ----
+$('#recForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = m => $('#recErr').textContent = m, cpf = digits($('#rCpf').value);
+  $('#recOk').classList.add('hidden'); err('');
+  if (!validCPF(cpf)) return err('Informe um CPF válido.');
+  const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === cpf);
+  if (!u) return err('Este CPF não tem cadastro neste aparelho.');
+  if (!u.email) return err('Este cadastro não tem e-mail. Fale com o seu gestor.');
+  if (!EMAILJS.serviceId || !EMAILJS.templateId || !EMAILJS.publicKey) return err('O envio de e-mail ainda não foi configurado. Fale com o seu gestor.');
+  if (!navigator.onLine) return err('Sem internet. Conecte-se para recuperar a senha.');
+  const n = new Uint32Array(1); crypto.getRandomValues(n);
+  const nova = String(n[0] % 1000000).padStart(6, '0');
+  const btn = $('#recBtn'); btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const r = await fetch('https://api.emailjs.com/api/v1.0/email/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_id: EMAILJS.serviceId, template_id: EMAILJS.templateId, user_id: EMAILJS.publicKey,
+        template_params: { to_email: u.email, to_name: u.nome.split(' ')[0], nova_senha: nova } }) });
+    if (!r.ok) throw new Error(await r.text());
+    u.hash = await hash(cpf + ':' + nova); lsSet(K_USERS, users); // só troca a senha depois que o e-mail saiu
+    const [a, dom] = u.email.split('@');
+    $('#recOk').textContent = `Nova senha enviada para ${a.slice(0, 2)}***@${dom}. Confira sua caixa de entrada (e o spam).`;
+    $('#recOk').classList.remove('hidden');
+    $('#lCpf').value = maskCPF(cpf);
+  } catch (x) { err('Não foi possível enviar o e-mail agora. Tente de novo em instantes.'); }
+  btn.disabled = false; btn.textContent = 'Enviar nova senha';
 });
 
 function entrar(u){
@@ -406,11 +533,12 @@ function entrar(u){
   $('#lPass').value = ''; $('#loginErr').textContent = '';
   start();
 }
+const usuarioAtual = () => lsGet(K_USERS, []).find(u => u.cpf === sessao.cpf) || {};
 function sair(){
   try { localStorage.removeItem(K_SESSION); } catch (e) {}
   sessao = null; location.hash = '';
   $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
-  $('#cadForm').classList.add('hidden'); $('#loginForm').classList.remove('hidden');
+  mostrarForm('loginForm');
 }
 function start(){
   loadClientes();
@@ -641,7 +769,8 @@ function propostaHTML(c, editavel){
       <div><small>Frequência</small><b>${esc(freqTxt(p))}</b></div>
       <div><small>Franquia</small><b>${esc(p.franquia)} kg/mês</b></div>
       <div><small>Excedente</small><b>${esc(p.excedente)}/kg</b></div>
-    </div></div>`;
+    </div>
+    <button class="btn btn-soft" style="margin-top:12px" onclick="mostrarPDF('${c.id}')">${I.doc} PDF da proposta / enviar pelo WhatsApp</button></div>`;
 }
 
 function checkinHTML(v){
@@ -817,11 +946,180 @@ async function verFoto(fid){
   v.onclick = () => v.remove(); document.body.appendChild(v);
 }
 
+/* =========================================================
+   PROPOSTA EM PDF (modelo Cheiro Verde)
+   ========================================================= */
+// Número por extenso (pt-BR)
+function extenso(n){
+  n = Math.floor(Number(n) || 0);
+  if (n === 0) return 'zero';
+  const U = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const D = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const C = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  const ate999 = x => { if (x === 100) return 'cem'; const c = Math.floor(x / 100), r = x % 100, p = [];
+    if (c) p.push(C[c]); if (r < 20) { if (r) p.push(U[r]); } else { p.push(D[Math.floor(r / 10)] + (r % 10 ? ' e ' + U[r % 10] : '')); } return p.join(' e '); };
+  const grupos = [], nomes = [['',''],['mil','mil'],['milhão','milhões'],['bilhão','bilhões']];
+  let i = 0; while (n > 0) { grupos.push([n % 1000, i]); n = Math.floor(n / 1000); i++; }
+  const nz = grupos.filter(([g]) => g).reverse();
+  const partes = nz.map(([g, k]) => k === 0 ? ate999(g) : k === 1 ? (g === 1 ? 'mil' : ate999(g) + ' mil') : ate999(g) + ' ' + nomes[k][g === 1 ? 0 : 1]);
+  if (partes.length === 1) return partes[0];
+  const [lg, lk] = nz[nz.length - 1];
+  const sep = lk === 0 && (lg < 100 || lg % 100 === 0) ? ' e ' : ' ';
+  return partes.slice(0, -1).join(' ') + sep + partes[partes.length - 1];
+}
+const numMoeda = s => Number(digits(s)) / 100;
+function reaisExtenso(v){
+  const r = Math.floor(v + 1e-9), c = Math.round((v - r) * 100);
+  const pr = r ? extenso(r) + (r === 1 ? ' real' : (r % 1000000 === 0 ? ' de reais' : ' reais')) : '';
+  const pc = c ? extenso(c) + (c === 1 ? ' centavo' : ' centavos') : '';
+  return pr && pc ? pr + ' e ' + pc : (pr || pc || 'zero reais');
+}
+const periodicidade = p => ({ '1x ao mês': 'Mensal', '2x ao mês': 'Quinzenal (2x ao mês)', 'Semanal': 'Semanal' }[p.frequencia] || p.frequenciaOutro || 'A combinar');
+
+const imgCache = {};
+async function imgData(url){
+  if (imgCache[url]) return imgCache[url];
+  const b = await (await fetch(url)).blob();
+  return imgCache[url] = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
+}
+
+async function gerarPropostaPDF(c){
+  const { jsPDF } = window.jspdf;
+  const [cab, rod, marca] = await Promise.all(['modelo/cabecalho.jpg', 'modelo/rodape.jpg', 'modelo/marca-dagua.jpg'].map(imgData));
+  const p = c.proposta, d = c.dados, vend = usuarioAtual();
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const L = 85, R = 540, FS = 10, LH = 12.9, MAXY = 740;
+  let y = 0;
+
+  const moldura = () => {
+    doc.addImage(marca, 'JPEG', -80, 250.3, 425, 425);
+    doc.addImage(cab, 'JPEG', 0, 0, 595.3, 75.6);
+    doc.addImage(rod, 'JPEG', 0, 750.8, 593.9, 90);
+  };
+  const novaPagina = () => { doc.addPage(); moldura(); y = 100; };
+  const garantir = h => { if (y + h > MAXY) novaPagina(); };
+  const estilo = r => r.b && r.i ? 'bolditalic' : r.b ? 'bold' : r.i ? 'italic' : 'normal';
+  const check = (x, yy) => { doc.setDrawColor(0); doc.setLineWidth(0.9); doc.lines([[2.4, 2.8], [5.2, -7]], x, yy - 3.4); };
+
+  // Parágrafo com trechos em negrito/itálico/sublinhado, quebra de linha e justificado
+  function par(runs, { x = L, w = R - L, justify = false, bullet = null, after = 0 } = {}){
+    // cada palavra guarda o espaço que vem antes dela (pre); sem espaço = palavra "colada" (ex.: sublinhado + dois-pontos)
+    const words = []; let pend = null;
+    runs.forEach(r => String(r.t).split(/(\s+)/).forEach(t => { if (!t) return;
+      if (/^\s+$/.test(t)) { pend = r; return; }
+      doc.setFont('helvetica', estilo(r)); words.push({ t, r, w: doc.getTextWidth(t), pre: words.length ? pend : null }); pend = null; }));
+    doc.setFontSize(FS);
+    const spW = r => { doc.setFont('helvetica', estilo(r)); return doc.getTextWidth(' '); };
+    const lines = []; let cur = [], cw = 0;
+    words.forEach(wd => { const add = (cur.length && wd.pre ? spW(wd.pre) : 0) + wd.w;
+      if (cur.length && wd.pre && cw + add > w) { lines.push(cur); cur = [wd]; cw = wd.w; } else { cur.push(wd); cw += add; } });
+    if (cur.length) lines.push(cur);
+    lines.forEach((ln, li) => {
+      garantir(LH);
+      if (li === 0 && bullet !== null) check(bullet, y);
+      const gaps = ln.filter((wd, i) => i && wd.pre).length;
+      const natural = ln.reduce((sum, wd, i) => sum + wd.w + (i && wd.pre ? spW(wd.pre) : 0), 0);
+      const extra = justify && li < lines.length - 1 && gaps ? (w - natural) / gaps : 0;
+      let xx = x;
+      ln.forEach((wd, i) => {
+        if (i && wd.pre) { const sp = spW(wd.pre) + extra;
+          if (ln[i - 1].r.u && wd.r.u) { doc.setLineWidth(0.6); doc.line(xx, y + 1.6, xx + sp, y + 1.6); } xx += sp; }
+        doc.setFont('helvetica', estilo(wd.r)); doc.text(wd.t, xx, y);
+        if (wd.r.u) { doc.setLineWidth(0.6); doc.line(xx, y + 1.6, xx + wd.w, y + 1.6); }
+        xx += wd.w;
+      });
+      y += LH;
+    });
+    y += after;
+  }
+  const T = (t, o = {}) => ({ t, ...o });
+  const bullet = (runs, after = 0) => par(runs, { x: L + 18, w: R - L - 18, justify: true, bullet: L, after });
+  const bonus = (t) => par([T(t)], { x: L + 25, w: R - L - 25, justify: true, bullet: L + 7 });
+
+  moldura(); doc.setTextColor(0);
+  const dt = p.data ? new Date(p.data) : new Date();
+  const mesCap = MESES[dt.getMonth()].replace(/^./, s => s.toUpperCase());
+  y = 86; doc.setFont('helvetica', 'normal'); doc.setFontSize(FS);
+  doc.text(`Bernardino de Campos, ${dt.getDate()} de ${mesCap} de ${dt.getFullYear()}.`, R, y, { align: 'right' });
+  y = 110;
+  par([T('Razão social:', { b: 1 }), T(' Cheiro Verde Comércio de Material Reciclável Ambiental Ltda.')]);
+  par([T('CNPJ:', { b: 1 }), T(' 06.003.515/0001-21')], { after: LH });
+  par([T('À ' + d.nome.toUpperCase(), { b: 1, u: 1 })]);
+  if (d.doc) par([T((digits(d.doc).length === 11 ? 'CPF nº ' : 'CNPJ nº ') + d.doc, { b: 1, u: 1 })]);
+  y += LH;
+  par([T('Assunto', { u: 1 }), T(': Prestação de Serviços.')]);
+  par([T('Referente', { u: 1 }), T(': Coleta, transporte, tratamento e disposição final de Resíduos do Serviço de Saúde – RSS.')], { after: LH });
+
+  par([T('1) ', { b: 1 }), T('Escopo dos Serviços:', { b: 1, u: 1 })], { after: 6 });
+  bullet([T('Resíduos a serem tratados: Resíduos classificados nos grupos “A, B e E” da Resolução CONAMA 358/05, conforme determina a Resolução RDC 222/18.')]);
+  bullet([T('Periodicidade: ' + periodicidade(p) + '.')], LH);
+
+  const preco = numMoeda(p.preco), exc = numMoeda(p.excedente), franq = Number(digits(p.franquia));
+  par([T('2) ', { b: 1 }), T('Proposta Comercial', { b: 1, u: 1 })], { after: 6 });
+  bullet([T('O valor para prestação de serviços será de '), T(`${p.preco} (${reaisExtenso(preco)})`, { b: 1 }),
+          T(' para uma franquia de '), T(`0 até ${p.franquia} (${extenso(franq)})`, { b: 1 }), T(' quilogramas de resíduos coletados no mês.')]);
+  bullet([T('Caso haja excedente, será cobrado '), T(`${p.excedente} (${reaisExtenso(exc)})`, { b: 1 }), T(' por quilograma excedente.')]);
+  bullet([T('A pesagem é no ato da coleta e fiscalizada pelo cliente.')]);
+  bullet([T('Não há taxa de transporte adicional.')]);
+  bullet([T('O pagamento será efetuado através de Boleto bancário emitido no início do mês subsequente ao da prestação do serviço.')], LH * 0.6);
+
+  par([T('Bônus da proposta:', { i: 1, u: 1 })], { after: 4 });
+  ['Orientações para o preenchimento do PGRSS - Plano de Gerenciamento de resíduos do serviço da saúde;',
+   'Orientação para a emissão do Manifesto de transporte de resíduos (MTR);',
+   'Certificado mensal de tratamento dos resíduos destinados;',
+   'Comprovante de coleta em forma digital, reduzindo os impactos ambientais;',
+   'Certificado de Tratamento;',
+   'O contrato terá vigência por 12 meses.'].forEach(bonus);
+  y += LH * 0.6;
+
+  par([T('3) ', { b: 1 }), T('Considerações:', { b: 1, u: 1 })], { after: 6 });
+  bullet([T('Os Resíduos serão tratados pelas empresas em equipamento especialmente construído para este fim, todos licenciados pelos órgãos ambientais, operado por pessoal treinado e disposto em aterro Classe I e Classe II.')], LH * 0.6);
+  par([T('A presente proposta vale por '), T('07 dias', { b: 1 }), T(', a partir desta data.')], { after: LH * 0.6 });
+  par([T('No aguardo de seu retorno, ficamos a sua disposição para qualquer esclarecimento adicional.')], { x: L + 18 });
+
+  // Assinatura do vendedor
+  if (y + 84 > 766) novaPagina(); // o bloco de assinatura pode descer até o início da faixa verde do rodapé
+  y += 4; doc.setFont('helvetica', 'normal'); doc.text('Atenciosamente,', 404, y);
+  const linhaY = y + 44, cx = 317;
+  if (vend.assinatura) {
+    const im = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = vend.assinatura; });
+    if (im) { const maxW = 150, maxH = 46, sc = Math.min(maxW / im.width, maxH / im.height); const w = im.width * sc, h = im.height * sc;
+      doc.addImage(vend.assinatura, 'PNG', cx - w / 2, linhaY - h + 8, w, h); }
+  }
+  doc.setLineWidth(0.7); doc.line(cx - 88, linhaY + 2, cx + 88, linhaY + 2);
+  y = linhaY + 14;
+  doc.setFont('helvetica', 'bold'); doc.text(vend.nome || sessao.nome, cx, y, { align: 'center' }); y += 12;
+  doc.setFont('helvetica', 'normal'); doc.text('Cheiro Verde Comércio de Mt. Reciclável Ambiental Ltda.', cx, y, { align: 'center' }); y += 12;
+  doc.text('CNPJ: 06.003.515/0001-21', cx, y, { align: 'center' });
+
+  const nome = `Proposta Comercial - ${d.nome} - ${periodicidade(p).split(' ')[0]} ${pad(dt.getDate())}.${pad(dt.getMonth() + 1)}.pdf`.replace(/[\\/:*?"<>|]/g, '');
+  return { blob: doc.output('blob'), nome };
+}
+
+// Gera o PDF e mostra as opções de envio (WhatsApp pelo compartilhamento do celular)
+async function mostrarPDF(id, aoFechar){
+  const c = byId(id);
+  const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Gerando a proposta em PDF…'; document.body.appendChild(b);
+  let arq;
+  try { arq = await gerarPropostaPDF(c); } catch (e) { b.remove(); toast('Não foi possível gerar o PDF'); if (aoFechar) aoFechar(); return; }
+  b.remove();
+  const file = new File([arq.blob], arq.nome, { type: 'application/pdf' });
+  const podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const bg = sheet(`<h3>Proposta em PDF pronta</h3><p class="sub">${esc(arq.nome)}</p>
+    ${podeCompartilhar ? `<button class="btn btn-green" id="pdfShare">${I.send} Enviar pelo WhatsApp</button>` : ''}
+    <button class="btn btn-soft" id="pdfOpen">${I.doc} ${podeCompartilhar ? 'Ver / baixar PDF' : 'Baixar PDF'}</button>
+    ${podeCompartilhar ? '<p class="hint">Ao tocar em enviar, escolha o <b>WhatsApp</b> e depois o contato do cliente.</p>' : '<p class="hint">Depois de baixar, envie o arquivo pelo WhatsApp.</p>'}
+    <button class="btn btn-ghost" data-close>Fechar</button>`, aoFechar);
+  const sh = bg.querySelector('#pdfShare');
+  if (sh) sh.onclick = async () => { try { await navigator.share({ files: [file], title: arq.nome, text: `Proposta comercial Cheiro Verde Ambiental – ${c.dados.nome}` }); } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível compartilhar'); } };
+  bg.querySelector('#pdfOpen').onclick = () => { const u = URL.createObjectURL(arq.blob); const a = document.createElement('a'); a.href = u; a.download = arq.nome; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); };
+}
+
 /* ---------- Sheet genérico ---------- */
-function sheet(html){
+function sheet(html, aoFechar){
   const bg = document.createElement('div'); bg.className = 'sheet-bg';
   bg.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
-  bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-close]')) bg.remove(); });
+  bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-close]')) { bg.remove(); if (aoFechar) aoFechar(); } });
   document.body.appendChild(bg); return bg;
 }
 
@@ -834,7 +1132,7 @@ function abrirProposta(id, depois){
       <div class="f" data-k="frequencia"><span>Frequência de coleta <i>*</i></span>
         <div class="chips">${FREQS.map(o => `<button type="button" class="chip ${o === p.frequencia ? 'on' : ''}" data-freq="${o}">${o}</button>`).join('')}</div>
         <div class="msg">Escolha a frequência</div></div>
-      <label class="f ${p.frequencia === 'Outros' ? '' : 'hidden'}" data-k="frequenciaOutro"><span>Descreva a frequência <i>*</i></span><input name="frequenciaOutro" value="${esc(p.frequenciaOutro)}" placeholder="Ex.: a cada 15 dias"><div class="msg">Descreva a frequência</div></label>
+      <label class="f ${p.frequencia === 'Outros' ? '' : 'hidden'}" data-k="frequenciaOutro"><span>Descreva a frequência <i>*</i></span><input name="frequenciaOutro" value="${esc(p.frequenciaOutro)}" placeholder="Inserir Frequência"><div class="msg">Descreva a frequência</div></label>
       <div class="grid2">
         <label class="f" data-k="franquia"><span>Franquia <i>*</i></span><div class="suffix"><input name="franquia" inputmode="numeric" placeholder="0" value="${esc(p.franquia)}"><em>kg/mês</em></div><div class="msg">Informe a franquia</div></label>
         <label class="f" data-k="excedente"><span>Excedente <i>*</i></span><div class="suffix"><input name="excedente" inputmode="numeric" placeholder="R$ 0,00" value="${esc(p.excedente)}"><em>/kg</em></div><div class="msg">Informe o excedente</div></label>
@@ -858,9 +1156,10 @@ function abrirProposta(id, depois){
     const bad = { preco: !np.preco, frequencia: !np.frequencia, frequenciaOutro: np.frequencia === 'Outros' && !np.frequenciaOutro, franquia: !np.franquia, excedente: !np.excedente };
     Object.entries(bad).forEach(([k, b]) => f.querySelector(`[data-k="${k}"]`).classList.toggle('bad', b));
     if (Object.values(bad).some(Boolean)) return;
+    np.data = new Date().toISOString();
     c.proposta = np; saveClientes(); bg.remove(); toast('Proposta salva');
-    if (depois) return depois();
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
+    mostrarPDF(id, depois); // gera o PDF no modelo da empresa e oferece o envio
   };
 }
 
