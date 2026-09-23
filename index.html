@@ -20,7 +20,7 @@
     --green:#289548; --green-d:#1e7a3a; --green-dd:#145a2a; --lime:#afcb09; --lime-soft:#f2f7d9;
     --bg:#f3f6f1; --surface:#fff; --ink:#18261c; --muted:#66756a; --line:#e1e8de;
     --red:#d64545; --red-bg:#fdeaea; --orange:#ef8a00; --orange-bg:#fff1dc; --ok:#289548; --ok-bg:#e3f4e8;
-    --blue:#2a6fdb; --blue-bg:#e8f0fd;
+    --blue:#2a6fdb; --blue-bg:#e8f0fd; --grey:#66756a; --grey-bg:#eef1ec;
     --radius:18px; --shadow:0 1px 2px rgba(20,50,30,.06),0 6px 18px rgba(20,50,30,.07);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -112,6 +112,10 @@
   .ccard .ln{font-size:14px;color:var(--muted);margin-top:6px;display:flex;gap:6px;align-items:flex-start}
   .ccard .ln svg{flex:none;margin-top:2px}
   .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .t-orange{background:var(--orange-bg);color:#b86a00} .t-red{background:var(--red-bg);color:var(--red)}
+  .ccard.outra{border-left-color:var(--orange)} .ccard.fech{border-left-color:#9aa696} .ccard.nexiste{border-left-color:var(--red)}
+  .result.outros{background:#eef1ec;color:var(--ink)}
+  .dot.o{background:#9aa696}
   .t-lime{background:var(--lime-soft);color:#6f8200} .t-ok{background:var(--ok-bg);color:var(--ok)} .t-blue{background:var(--blue-bg);color:var(--blue)} .t-grey{background:#eef1ec;color:var(--muted)}
   .empty{text-align:center;color:var(--muted);padding:48px 16px;font-size:15px}
   .empty svg{opacity:.35;margin-bottom:10px}
@@ -230,7 +234,7 @@
     <h1>Área do Vendedor</h1>
     <p class="lead">Entre para acompanhar suas visitas e contratos.</p>
     <label class="lfield"><span>CPF</span><input id="lCpf" name="username" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14"></label>
-    <label class="lfield"><span>Senha</span><input id="lPass" name="password" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
+    <label class="lfield"><span>Senha</span><input id="lPass" name="password" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="current-password" placeholder="Somente números"></label>
     <button class="btn-white" type="submit">Entrar</button>
     <button class="btn-outline" type="button" id="goCadastro">Primeiro acesso</button>
     <button class="btn-link" type="button" id="goRecuperar">Recuperar senha</button>
@@ -244,8 +248,8 @@
     <label class="lfield"><span>Nome completo</span><input id="cNome" autocomplete="name" placeholder="Seu nome completo"></label>
     <label class="lfield"><span>CPF</span><input id="cCpf" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" maxlength="14"></label>
     <label class="lfield"><span>E-mail corporativo</span><input id="cEmail" type="email" inputmode="email" autocomplete="email" placeholder="nome@cheiroverdeambiental.com.br"></label>
-    <label class="lfield"><span>Senha</span><input id="cPass" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres"></label>
-    <label class="lfield"><span>Repetir senha</span><input id="cPass2" type="password" autocomplete="new-password" placeholder="Digite a senha novamente"></label>
+    <label class="lfield"><span>Senha</span><input id="cPass" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="new-password" placeholder="De 4 a 10 números"></label>
+    <label class="lfield"><span>Repetir senha</span><input id="cPass2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="new-password" placeholder="Digite a senha novamente"></label>
     <div class="lfield"><span>Assinatura <small>(vai nas propostas em PDF)</small></span>
       <div class="sigbox"><canvas id="cSig"></canvas><em class="sigph">Assine aqui com o dedo</em></div>
       <button type="button" class="sigclear" data-limpar="cSig">Limpar assinatura</button>
@@ -267,9 +271,18 @@
     <div class="lerr" id="perfilErr"></div>
   </form>
 
+  <form id="senhaForm" class="lform hidden" novalidate>
+    <h1>Crie uma nova senha</h1>
+    <p class="lead">Você entrou com uma senha provisória. Cadastre agora a sua senha definitiva.</p>
+    <label class="lfield"><span>Nova senha</span><input id="nPass" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="new-password" placeholder="De 4 a 10 números"></label>
+    <label class="lfield"><span>Repetir nova senha</span><input id="nPass2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="new-password" placeholder="Digite a senha novamente"></label>
+    <button class="btn-white" type="submit">Salvar nova senha</button>
+    <div class="lerr" id="senhaErr"></div>
+  </form>
+
   <form id="recForm" class="lform hidden" novalidate>
     <h1>Recuperar senha</h1>
-    <p class="lead">Vamos enviar uma nova senha de 6 números para o e-mail cadastrado neste CPF.</p>
+    <p class="lead">Vamos enviar uma senha provisória de 6 números para o e-mail cadastrado neste CPF. Ao entrar com ela, você cria a sua nova senha.</p>
     <label class="lfield"><span>CPF</span><input id="rCpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14"></label>
     <button class="btn-white" type="submit" id="recBtn">Enviar nova senha</button>
     <button class="btn-outline" type="button" data-voltar>Voltar ao login</button>
@@ -298,7 +311,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '7';
+const VERSAO = '8';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -385,6 +398,7 @@ async function hash(s){
 }
 
 const I = {
+  building:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>',
   home:'<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>',
   back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   out:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
@@ -409,6 +423,9 @@ const I = {
 const DOMINIO = '@cheiroverdeambiental.com.br';
 const emailCorporativo = v => new RegExp('^[^\\s@]+' + DOMINIO.replace(/\./g, '\\.') + '$', 'i').test(String(v).trim());
 ['#lCpf', '#cCpf', '#rCpf'].forEach(s => $(s).addEventListener('input', e => e.target.value = maskCPF(e.target.value)));
+// Senhas: somente números, de 4 a 10 dígitos
+const senhaValida = v => /^\d{4,10}$/.test(v);
+['#lPass', '#cPass', '#cPass2', '#nPass', '#nPass2'].forEach(s => $(s).addEventListener('input', e => e.target.value = digits(e.target.value).slice(0, 10)));
 
 // ---- Campo de assinatura (dedo ou caneta) ----
 function criarPad(canvas){
@@ -469,8 +486,7 @@ $('#loginForm').addEventListener('submit', async e => {
   const cpf = digits($('#lCpf').value), pass = $('#lPass').value;
   const u = lsGet(K_USERS, []).find(x => x.cpf === cpf);
   if (!u || u.hash !== await hash(cpf + ':' + pass)) { $('#loginErr').textContent = 'CPF ou senha inválidos. Se é seu primeiro acesso, toque em "Primeiro acesso".'; return; }
-  if (!u.email || !u.assinatura) { usuarioPendente = u; mostrarForm('perfilForm'); $('#pEmail').value = u.email || ''; return; }
-  entrar(u);
+  posLogin(u);
 });
 
 $('#cadForm').addEventListener('submit', async e => {
@@ -481,7 +497,7 @@ $('#cadForm').addEventListener('submit', async e => {
   if (nome.split(' ').length < 2) return err('Informe seu nome completo (nome e sobrenome).');
   if (!validCPF(cpf)) return err('CPF inválido. Confira os números.');
   if (!emailCorporativo(email)) return err('Use o seu e-mail corporativo, terminado em ' + DOMINIO + '.');
-  if (p1.length < 6) return err('A senha precisa ter pelo menos 6 caracteres.');
+  if (!senhaValida(p1)) return err('A senha deve ter de 4 a 10 números (somente números).');
   if (p1 !== p2) return err('As senhas não são iguais.');
   if (pads.cSig.vazia()) return err('Faça a sua assinatura no quadro.');
   const users = lsGet(K_USERS, []);
@@ -494,6 +510,25 @@ $('#cadForm').addEventListener('submit', async e => {
 
 // Cadastros antigos (sem e-mail ou assinatura) completam os dados no próximo login
 let usuarioPendente = null;
+// Depois da senha conferida: senha provisória -> criar nova; cadastro incompleto -> completar; senão entra
+function posLogin(u){
+  usuarioPendente = u;
+  if (u.senhaProvisoria) { mostrarForm('senhaForm'); setTimeout(() => $('#nPass').focus(), 50); return; }
+  if (!u.email || !u.assinatura) { mostrarForm('perfilForm'); $('#pEmail').value = u.email || ''; return; }
+  entrar(u);
+}
+$('#senhaForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const p1 = $('#nPass').value, p2 = $('#nPass2').value, err = m => $('#senhaErr').textContent = m;
+  if (!senhaValida(p1)) return err('A senha deve ter de 4 a 10 números (somente números).');
+  if (p1 !== p2) return err('As senhas não são iguais.');
+  const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === usuarioPendente.cpf), h = await hash(u.cpf + ':' + p1);
+  if (h === u.hash) return err('Escolha uma senha diferente da senha provisória.');
+  u.hash = h; delete u.senhaProvisoria; lsSet(K_USERS, users);
+  $('#nPass').value = $('#nPass2').value = '';
+  toast('Nova senha salva!');
+  posLogin(u);
+});
 $('#perfilForm').addEventListener('submit', e => {
   e.preventDefault();
   const email = $('#pEmail').value.trim().toLowerCase(), err = m => $('#perfilErr').textContent = m;
@@ -520,9 +555,9 @@ $('#recForm').addEventListener('submit', async e => {
   const btn = $('#recBtn'); btn.disabled = true; btn.textContent = 'Enviando…';
   try {
     await google('recuperarSenha', { email: u.email, nome: u.nome, cpf, senha: nova });
-    u.hash = await hash(cpf + ':' + nova); lsSet(K_USERS, users); // só troca a senha depois que o e-mail saiu
+    u.hash = await hash(cpf + ':' + nova); u.senhaProvisoria = true; lsSet(K_USERS, users); // só troca depois que o e-mail saiu
     const [a, dom] = u.email.split('@');
-    $('#recOk').textContent = `Nova senha enviada para ${a.slice(0, 2)}***@${dom}. Confira sua caixa de entrada (e o spam).`;
+    $('#recOk').textContent = `Senha provisória enviada para ${a.slice(0, 2)}***@${dom}. Confira sua caixa de entrada (e o spam).`;
     $('#recOk').classList.remove('hidden');
     $('#lCpf').value = maskCPF(cpf);
   } catch (x) { err('Não foi possível enviar o e-mail agora. Tente de novo em instantes.'); }
@@ -648,12 +683,20 @@ function viewHome(){
 /* =========================================================
    CARDS DE CLIENTE
    ========================================================= */
+// Resultados possíveis ao finalizar a visita
+const RESULTADOS = {
+  proposta:     { txt: 'Proposta enviada', tag: 't-blue', cls: 'prop' },
+  contrato:     { txt: 'Contrato fechado', tag: 't-ok', cls: 'done' },
+  outraEmpresa: { txt: 'Atendido por outra empresa', tag: 't-orange', cls: 'outra' },
+  fechado:      { txt: 'Cliente fechado', tag: 't-grey', cls: 'fech' },
+  naoExiste:    { txt: 'Cliente não existe', tag: 't-red', cls: 'nexiste' },
+};
 function clienteCard(c){
   const d = c.dados;
   let tag = '<span class="tag t-lime">A visitar</span>', cls = '';
   if (c.status === 'pendente' && c.visita && c.visita.modalidade) tag = '<span class="tag t-grey">Em andamento</span>';
-  if (c.resultado === 'contrato') { tag = '<span class="tag t-ok">Contrato fechado</span>'; cls = 'done'; }
-  if (c.resultado === 'proposta') { tag = '<span class="tag t-blue">Proposta enviada</span>'; cls = 'prop'; }
+  const R = RESULTADOS[c.resultado];
+  if (R) { tag = `<span class="tag ${R.tag}">${R.txt}</span>`; cls = R.cls; }
   return `<button class="ccard ${cls}" onclick="location.hash='cliente/${c.id}'">
     <div class="row"><span class="nm">${esc(d.nome)}</span>${tag}</div>
     <div class="ln">${I.pinS}<span>${esc(d.endereco)}, ${esc(d.numero)} – ${esc(d.bairro)}, ${esc(d.cidade)}</span></div>
@@ -836,13 +879,13 @@ function viewCliente(id){
       <label class="f"><textarea oninput="setVisita('obs',this.value)" placeholder="Anotações sobre a visita">${esc(v.obs)}</textarea></label></div>` : ''}
 
     ${propostaHTML(c, true)}
-    <div class="bottom-bar"><button class="btn btn-green" onclick="abrirFinalizar('${c.id}')">Finalizar visita</button></div>
-    ` : ''}`;
+    ` : '<p class="hint" style="margin:0 4px">Cliente fechado, inexistente ou atendido por outra empresa? Toque em <b>Finalizar visita</b>.</p>'}
+    <div class="bottom-bar"><button class="btn btn-green" onclick="abrirFinalizar('${c.id}')">Finalizar visita</button></div>`;
   carregarFotos();
 }
 
 function fotosHTML(c){
-  const v = c.visita, pres = v.modalidade === 'presencial';
+  const v = { ...c.visita, fotos: c.visita.fotos.filter(f => f.tipo !== 'fachada') }, pres = v.modalidade === 'presencial';
   const titulo = pres ? 'Fotos do local' : 'Fotos / anexos (opcional)';
   const selo = v.fotos.length ? `<span class="okk">${v.fotos.length} de 3</span>` : (pres ? '<span class="req">Mín. 1 foto</span>' : '');
   return `<div class="sec"><h3>${titulo} ${selo}</h3>
@@ -876,6 +919,16 @@ function setVisita(k, val, rerender){
 function setMotivo(m){ setVisita('motivo', m, true); }
 
 /* ---------- Check-in (geolocalização) ---------- */
+function obterLocalizacao(ok){
+  if (!('geolocation' in navigator)) return toast('Este aparelho não permite localização');
+  const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Obtendo sua localização…'; document.body.appendChild(b);
+  navigator.geolocation.getCurrentPosition(pos => {
+    b.remove(); ok({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy, em: new Date().toISOString() });
+  }, err => {
+    b.remove();
+    toast(err.code === 1 ? 'Permita o acesso à localização nas configurações do celular' : 'Não foi possível obter a localização. Tente de novo.');
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
 function fazerCheckin(id){
   if (!('geolocation' in navigator)) return toast('Este aparelho não permite localização');
   const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Obtendo sua localização…'; document.body.appendChild(b);
@@ -891,16 +944,18 @@ function fazerCheckin(id){
 }
 
 /* ---------- Fotos com data, hora e local gravados ---------- */
-let fotoCliente = null;
-function tirarFoto(id){
-  fotoCliente = id;
-  const inp = byId(id).visita.modalidade === 'presencial' ? $('#fileCamera') : $('#fileGaleria');
+let fotoCtx = null; // { cid, tipo: 'local' | 'fachada', aoConcluir }
+function tirarFoto(id, tipo = 'local', aoConcluir = null){
+  fotoCtx = { cid: id, tipo, aoConcluir };
+  const camera = tipo === 'fachada' || byId(id).visita.modalidade === 'presencial';
+  const inp = camera ? $('#fileCamera') : $('#fileGaleria');
   inp.value = ''; inp.click();
 }
 ['#fileCamera', '#fileGaleria'].forEach(sel => $(sel).addEventListener('change', e => receberFoto(e, sel === '#fileCamera')));
 async function receberFoto(e, camera){
-  const file = e.target.files[0]; if (!file || !fotoCliente) return;
-  const c = byId(fotoCliente); if (c.visita.fotos.length >= 3) return;
+  const file = e.target.files[0]; if (!file || !fotoCtx) return;
+  const ctx = fotoCtx, c = byId(ctx.cid);
+  if (ctx.tipo === 'local' && c.visita.fotos.filter(f => f.tipo !== 'fachada').length >= 3) return;
   // Segunda trava da visita presencial: foto recém-tirada tem data de agora; foto antiga da galeria é recusada
   if (camera && file.lastModified && Date.now() - file.lastModified > 3 * 60 * 1000) {
     toast('Na visita presencial, use apenas foto tirada agora pela câmera'); return;
@@ -908,28 +963,31 @@ async function receberFoto(e, camera){
   const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Processando foto…'; document.body.appendChild(b);
   try {
     const agora = new Date();
-    const data = await carimbarFoto(file, agora, c);
+    const data = await carimbarFoto(file, agora, c, ctx.tipo);
     const fid = 'f' + Date.now().toString(36);
     await FotoDB.put(fid, data);
-    c.visita.fotos.push({ id: fid, em: agora.toISOString() });
+    c.visita.fotos.push({ id: fid, em: agora.toISOString(), tipo: ctx.tipo });
     saveClientes(); toast('Foto adicionada');
+    if (ctx.aoConcluir) { b.remove(); return ctx.aoConcluir(fid); }
   } catch (err) { toast('Não foi possível usar esta foto'); }
-  b.remove(); const y = window.scrollY; viewCliente(c.id); window.scrollTo(0, y);
+  b.remove(); if (ctx.aoConcluir) return;
+  const y = window.scrollY; viewCliente(c.id); window.scrollTo(0, y);
 }
 
 async function carregarImagem(file){
   if (window.createImageBitmap) { try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {} }
   return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = URL.createObjectURL(file); });
 }
-async function carimbarFoto(file, quando, c){
+async function carimbarFoto(file, quando, c, tipo = 'local'){
   const img = await carregarImagem(file);
   const MAX = 1600, sc = Math.min(1, MAX / Math.max(img.width, img.height));
   const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const g = cv.getContext('2d'); g.drawImage(img, 0, 0, w, h);
   const fs = Math.max(18, Math.round(w * 0.032)), padd = Math.round(fs * 0.7);
-  const pres = c.visita.modalidade === 'presencial';
-  const linhas = [pres ? brDateTime(quando) : 'Anexado em ' + brDateTime(quando).slice(0, 16), pres ? c.dados.nome : c.dados.nome + ' · visita virtual'];
+  const pres = tipo === 'fachada' || c.visita.modalidade === 'presencial';
+  const linhas = [pres ? brDateTime(quando) : 'Anexado em ' + brDateTime(quando).slice(0, 16),
+    tipo === 'fachada' ? c.dados.nome + ' · fachada (cliente fechado)' : pres ? c.dados.nome : c.dados.nome + ' · visita virtual'];
   const k = c.visita.checkin; if (pres && k) linhas.push(`${k.lat.toFixed(5)}, ${k.lng.toFixed(5)}`);
   const bh = padd * 2 + fs * 1.3 * linhas.length;
   g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, h - bh, w, bh);
@@ -1178,7 +1236,7 @@ function abrirProposta(id, depois){
     np.data = new Date().toISOString();
     c.proposta = np; saveClientes(); bg.remove(); toast('Proposta salva');
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
-    mostrarPDF(id, depois || irInicio); // gera o PDF e, ao fechar, volta para a tela principal
+    mostrarPDF(id, depois); // gera o PDF; ao fechar, continua no cliente (ou segue a finalização)
   };
 }
 
@@ -1189,33 +1247,96 @@ function pendencias(c){
   if (!v.modalidade) p.push('Escolher a modalidade da visita');
   if (v.modalidade === 'presencial') {
     if (!v.checkin) p.push('Fazer o check-in no local');
-    if (!v.fotos.length) p.push('Incluir pelo menos 1 foto do local');
+    if (!v.fotos.filter(f => f.tipo !== 'fachada').length) p.push('Incluir pelo menos 1 foto do local');
   }
   if (v.motivo === 'Outros' && !v.motivoOutro.trim()) p.push('Descrever o motivo da visita');
   return p;
 }
-function abrirFinalizar(id){
-  const c = byId(id), p = pendencias(c);
-  if (p.length) return sheet(`<h3>Falta pouco</h3><p class="sub">Para finalizar a visita, complete:</p>
+const faltaSheet = p => sheet(`<h3>Falta pouco</h3><p class="sub">Para finalizar com proposta ou contrato, complete:</p>
     <div class="missing"><ul>${p.map(x => `<li>${x}</li>`).join('')}</ul></div>
     <button class="btn btn-green" data-close>Entendi</button>`);
+const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div class="ic" style="background:var(--${cor}-bg);color:var(--${cor === 'ok' ? 'ok' : cor})">${ic}</div><div><b>${titulo}</b><small>${sub}</small></div></button>`;
+
+function abrirFinalizar(id){
+  const c = byId(id);
   const bg = sheet(`<h3>Finalizar visita</h3><p class="sub">${esc(c.dados.nome)} · Como terminou a visita?</p>
-    <button class="opt" data-r="proposta"><div class="ic" style="background:var(--blue-bg);color:var(--blue)">${I.send}</div><div><b>Proposta enviada</b><small>Vai para Visitas Realizadas</small></div></button>
-    <button class="opt" data-r="contrato"><div class="ic" style="background:var(--ok-bg);color:var(--ok)">${I.doc}</div><div><b>Contrato fechado</b><small>Vai para Visitas Realizadas e Contratos Fechados</small></div></button>
-    ${!c.proposta ? '<p class="hint" style="margin:0 0 12px">Em seguida você vai preencher a proposta (preço, frequência, franquia e excedente).</p>' : ''}
+    ${opt('proposta', I.send, 'blue', 'Proposta enviada', 'Vai para Visitas Realizadas')}
+    ${opt('contrato', I.doc, 'ok', 'Contrato fechado', 'Vai para Visitas Realizadas e Contratos Fechados')}
+    ${opt('outraEmpresa', I.building, 'orange', 'Cliente já atendido por outra empresa', 'Informe qual empresa atende hoje')}
+    ${opt('fechado', I.cam, 'grey', 'Cliente fechado', 'Obrigatório: foto da fachada')}
+    ${opt('naoExiste', I.pin, 'red', 'Cliente não existe', 'Obrigatório: registrar a localização')}
     <button class="btn btn-ghost" data-close>Cancelar</button>`);
   bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const r = b.dataset.r; bg.remove();
-    const concluir = () => finalizar(id, r);
-    c.proposta ? concluir() : abrirProposta(id, concluir);
+    if (r === 'proposta' || r === 'contrato') {
+      const p = pendencias(c); if (p.length) return faltaSheet(p);
+      const concluir = () => finalizar(id, r);
+      return c.proposta ? concluir() : abrirProposta(id, concluir);
+    }
+    if (r === 'outraEmpresa') return finalizarOutraEmpresa(id);
+    if (r === 'fechado') return finalizarFechado(id);
+    if (r === 'naoExiste') return finalizarNaoExiste(id);
   });
 }
-function finalizar(id, resultado){
+
+function finalizarOutraEmpresa(id){
+  const c = byId(id);
+  const bg = sheet(`<h3>Atendido por outra empresa</h3><p class="sub">${esc(c.dados.nome)}</p>
+    <form id="fOutra" novalidate>
+      <label class="f" data-k="emp"><span>Qual empresa atende hoje? <i>*</i></span><input name="emp" value="${esc(c.concorrente || '')}" placeholder="Nome da empresa"><div class="msg">Informe o nome da empresa</div></label>
+      <button class="btn btn-green" type="submit">Finalizar visita</button>
+      <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+    </form>`);
+  const f = bg.querySelector('#fOutra'); setTimeout(() => f.emp.focus(), 100);
+  f.onsubmit = e => { e.preventDefault(); const emp = f.emp.value.trim();
+    if (!emp) return f.querySelector('.f').classList.add('bad');
+    bg.remove(); finalizar(id, 'outraEmpresa', { concorrente: emp }); };
+}
+
+function finalizarFechado(id){
+  let fid = null;
+  const bg = sheet(`<h3>Cliente fechado</h3><p class="sub">Tire uma foto da fachada para registrar a visita.</p>
+    <div id="fachadaBox"></div>
+    <button class="btn btn-lime" id="btnFachada">${I.cam} Tirar foto da fachada</button>
+    <button class="btn btn-green" id="btnFechado" disabled>Finalizar visita</button>
+    <button class="btn btn-ghost" data-close>Cancelar</button>`, async () => { // cancelou: descarta a foto tirada
+      if (!fid) return; const c = byId(id); c.visita.fotos = c.visita.fotos.filter(f => f.id !== fid); saveClientes(); try { await FotoDB.del(fid); } catch (e) {} });
+  const atualizar = async () => {
+    if (!fid) return;
+    const d = await FotoDB.get(fid);
+    bg.querySelector('#fachadaBox').innerHTML = `<div class="ph" style="width:140px;margin-bottom:12px"><img src="${d}" alt=""></div>`;
+    bg.querySelector('#btnFachada').innerHTML = `${I.cam} Tirar outra foto`;
+    bg.querySelector('#btnFechado').disabled = false;
+  };
+  bg.querySelector('#btnFachada').onclick = () => tirarFoto(id, 'fachada', async novo => {
+    if (fid) { const c = byId(id); c.visita.fotos = c.visita.fotos.filter(f => f.id !== fid); saveClientes(); try { await FotoDB.del(fid); } catch (e) {} }
+    fid = novo; atualizar();
+  });
+  bg.querySelector('#btnFechado').onclick = () => { if (!fid) return; bg.remove(); finalizar(id, 'fechado'); };
+}
+
+function finalizarNaoExiste(id){
+  const c = byId(id);
+  const bg = sheet(`<h3>Cliente não existe</h3><p class="sub">Registre a sua localização no endereço informado.</p>
+    <div id="locBox">${c.visita.checkin ? checkinHTML(c.visita) : ''}</div>
+    <button class="btn btn-lime" id="btnLoc" style="margin-top:12px">${I.pinS} ${c.visita.checkin ? 'Registrar novamente' : 'Registrar localização'}</button>
+    <button class="btn btn-green" id="btnNaoExiste" ${c.visita.checkin ? '' : 'disabled'}>Finalizar visita</button>
+    <button class="btn btn-ghost" data-close>Cancelar</button>`);
+  bg.querySelector('#btnLoc').onclick = () => obterLocalizacao(pos => {
+    c.visita.checkin = pos; saveClientes();
+    bg.querySelector('#locBox').innerHTML = checkinHTML(c.visita);
+    bg.querySelector('#btnNaoExiste').disabled = false;
+  });
+  bg.querySelector('#btnNaoExiste').onclick = () => { if (!c.visita.checkin) return; bg.remove(); finalizar(id, 'naoExiste'); };
+}
+
+function finalizar(id, resultado, extra = {}){
   const c = byId(id), hoje = isoDate(new Date());
   c.status = 'realizada'; c.resultado = resultado; c.visitadoEm = hoje; c.finalizadoEm = new Date().toISOString();
   c.contratoEm = resultado === 'contrato' ? hoje : null;
+  c.concorrente = resultado === 'outraEmpresa' ? extra.concorrente : (c.concorrente || '');
   saveClientes();
-  toast(resultado === 'contrato' ? 'Contrato fechado registrado! 🎉' : 'Visita registrada com proposta enviada');
+  toast(resultado === 'contrato' ? 'Contrato fechado registrado! 🎉' : 'Visita registrada: ' + RESULTADOS[resultado].txt.toLowerCase());
   irInicio();
 }
 function converterContrato(id){
@@ -1231,11 +1352,13 @@ function viewClienteRealizado(c){
   const v = c.visita;
   const res = c.resultado === 'contrato'
     ? `<div class="result contrato">${I.doc}<div>Contrato fechado em ${brDate(c.contratoEm)}<br><small style="font-weight:500">Visita em ${brDate(c.visitadoEm)}</small></div></div>`
-    : `<div class="result proposta">${I.send}<div>Proposta enviada em ${brDate(c.visitadoEm)}</div></div>`;
+    : c.resultado === 'proposta' ? `<div class="result proposta">${I.send}<div>Proposta enviada em ${brDate(c.visitadoEm)}</div></div>`
+    : `<div class="result outros">${c.resultado === 'outraEmpresa' ? I.building : c.resultado === 'fechado' ? I.cam : I.pin}<div>${RESULTADOS[c.resultado].txt} · ${brDate(c.visitadoEm)}
+        ${c.resultado === 'outraEmpresa' ? `<br><small style="font-weight:500">Empresa atual: <b>${esc(c.concorrente)}</b></small>` : ''}</div></div>`;
   $('#view').innerHTML = `${res}
     ${dadosHTML(c, false)}
-    <div class="sec"><h3>Visita</h3><dl class="kv">
-      <dt>Modalidade</dt><dd style="text-transform:capitalize">${esc(v.modalidade)}</dd>
+    ${v.modalidade || v.contato || v.atendimento || v.motivo || v.obs || v.checkin || v.fotos.length ? `<div class="sec"><h3>Visita</h3><dl class="kv">
+      ${v.modalidade ? `<dt>Modalidade</dt><dd style="text-transform:capitalize">${esc(v.modalidade)}</dd>` : ''}
       ${v.contato ? `<dt>Contato</dt><dd>${esc(v.contato)}</dd>` : ''}
       ${v.atendimento ? `<dt>Atendimento</dt><dd>${esc(v.atendimento)}</dd>` : ''}
       ${v.motivo ? `<dt>Motivo</dt><dd>${esc(motivoTxt(v))}</dd>` : ''}
@@ -1243,8 +1366,8 @@ function viewClienteRealizado(c){
     </dl>
     ${v.checkin ? `<div style="margin-top:14px">${checkinHTML(v)}</div>` : ''}
     ${v.fotos.length ? `<div class="photos" style="margin-top:14px">${v.fotos.map(f => `<div class="ph"><img data-foto="${f.id}" alt="" onclick="verFoto('${f.id}')"></div>`).join('')}</div>` : ''}
-    </div>
-    ${propostaHTML(c, false)}
+    </div>` : ''}
+    ${c.proposta ? propostaHTML(c, false) : ''}
     ${c.resultado === 'proposta' ? `<div class="bottom-bar"><button class="btn btn-green" onclick="converterContrato('${c.id}')">Cliente aceitou: registrar contrato fechado</button></div>` : ''}`;
   carregarFotos();
 }
@@ -1275,9 +1398,9 @@ function viewRealizadas(){
   for (let i = 0; i < primeiroDia; i++) cells += '<div class="day out"></div>';
   for (let d = 1; d <= nDias; d++) {
     const iso = `${prefix}-${pad(d)}`, v = porDia[iso] || [];
-    const nc = v.filter(c => c.resultado === 'contrato').length, np = v.length - nc;
+    const nc = v.filter(c => c.resultado === 'contrato').length, np = v.filter(c => c.resultado === 'proposta').length, no = v.length - nc - np;
     const cls = ['day', v.length ? 'has' : '', iso === isoDate(hoje) ? 'today' : '', iso === calState.sel ? 'sel' : ''].join(' ');
-    cells += `<button class="${cls}" onclick="selDia('${iso}')">${d}${v.length ? `<span class="cnt">${v.length}</span><span class="dots">${np ? '<i class="dot p"></i>' : ''}${nc ? '<i class="dot c"></i>' : ''}</span>` : ''}</button>`;
+    cells += `<button class="${cls}" onclick="selDia('${iso}')">${d}${v.length ? `<span class="cnt">${v.length}</span><span class="dots">${np ? '<i class="dot p"></i>' : ''}${nc ? '<i class="dot c"></i>' : ''}${no ? '<i class="dot o"></i>' : ''}</span>` : ''}</button>`;
   }
 
   const sel = calState.sel && calState.sel.startsWith(prefix) ? calState.sel : null;
@@ -1295,7 +1418,7 @@ function viewRealizadas(){
       <div class="cal-sum"><div><b>${doMes.length}</b>visitas no mês</div><div><b>${fechadosMes}</b>contratos fechados</div></div>
       <div class="wk"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div>
       <div class="days">${cells}</div>
-      <div class="legend"><span><i class="dot p"></i>Proposta enviada</span><span><i class="dot c"></i>Contrato fechado</span></div>
+      <div class="legend"><span><i class="dot p"></i>Proposta</span><span><i class="dot c"></i>Contrato</span><span><i class="dot o"></i>Outros</span></div>
     </div>
     ${sel ? titulo + (doDia.length ? `<div class="list">${doDia.map(clienteCard).join('')}</div>` : '<div class="empty" style="padding:24px">Nenhuma visita neste dia.</div>')
           : '<div class="empty" style="padding:24px">Toque em um dia do calendário.</div>'}`;
@@ -1351,7 +1474,7 @@ async function sincronizar(){
       for (const f of c.visita.fotos) {
         if (st.fotos[f.id]) continue;
         const data = await FotoDB.get(f.id); if (!data) continue;
-        const r = await google('foto', { clienteId: c.id, clienteNome: c.dados.nome, vendedor: u.nome, fotoId: f.id, em: f.em,
+        const r = await google('foto', { clienteId: c.id, clienteNome: c.dados.nome, vendedor: u.nome, fotoId: f.id, em: f.em, tipo: f.tipo || 'local',
           modalidade: c.visita.modalidade, base64: data.split(',')[1] });
         st.fotos[f.id] = r.url || true; salvar();
       }
