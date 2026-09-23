@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12305a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vendas">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Vendas Externas</title>
+<style>
+  :root{
+    --bg:#f3f5f9; --surface:#fff; --ink:#15213a; --muted:#6b7688; --line:#e3e7ef;
+    --brand:#12305a; --brand-2:#1d4b8a; --ok:#1f9d5c; --ok-bg:#e4f6ec;
+    --warn:#c9820a; --warn-bg:#fdf1dc; --info:#2563eb; --info-bg:#e6eefe; --no:#8a93a3; --no-bg:#eef0f4;
+    --radius:16px; --shadow:0 1px 2px rgba(16,32,64,.06),0 4px 14px rgba(16,32,64,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:16px}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  .hidden{display:none!important}
+
+  /* ---------- Login ---------- */
+  #login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:32px 24px;
+    background:linear-gradient(160deg,var(--brand) 0%,var(--brand-2) 100%);color:#fff}
+  .logo{width:64px;height:64px;border-radius:18px;background:rgba(255,255,255,.12);display:grid;place-items:center;margin-bottom:20px}
+  #login h1{margin:0 0 6px;font-size:28px}
+  #login p{margin:0 0 28px;opacity:.8}
+  .field{display:block;margin-bottom:14px}
+  .field span{display:block;font-size:13px;margin-bottom:6px;opacity:.85}
+  .field input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font-size:16px;outline:none}
+  .field input:focus{border-color:#fff;background:rgba(255,255,255,.16)}
+  .btn-primary{width:100%;padding:15px;border-radius:12px;background:#fff;color:var(--brand);font-weight:700;margin-top:8px}
+  .err{color:#ffd1d1;font-size:14px;min-height:20px;margin-top:10px}
+
+  /* ---------- Estrutura ---------- */
+  header.top{position:sticky;top:0;z-index:5;background:var(--brand);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;display:flex;align-items:center;gap:12px}
+  header.top h2{margin:0;font-size:18px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .icon-btn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.12)}
+  main{padding:16px 16px calc(env(safe-area-inset-bottom) + 96px);max-width:720px;margin:0 auto}
+  .hello{margin:4px 0 16px;color:var(--muted);font-size:14px}
+  .hello b{color:var(--ink);font-size:20px;display:block;margin-top:2px}
+
+  /* ---------- Home: 2 cards por linha ---------- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .kpi{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;text-align:left;
+    display:flex;flex-direction:column;gap:10px;min-height:150px;border:1px solid var(--line);transition:transform .1s}
+  .kpi:active{transform:scale(.98)}
+  .kpi .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center}
+  .kpi .num{font-size:34px;font-weight:800;line-height:1;margin-top:auto}
+  .kpi .lbl{font-size:14px;font-weight:600;color:var(--muted);line-height:1.25}
+  .k-ok .ic{background:var(--ok-bg);color:var(--ok)}
+  .k-warn .ic{background:var(--warn-bg);color:var(--warn)}
+  .k-info .ic{background:var(--info-bg);color:var(--info)}
+
+  /* ---------- Listas de cards ---------- */
+  .list{display:flex;flex-direction:column;gap:12px}
+  .list.two{display:grid;grid-template-columns:1fr 1fr}
+  .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);padding:16px;min-height:96px;display:flex;flex-direction:column;gap:10px}
+  .card .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .card .ttl{font-weight:700}
+  .card .sub{font-size:13px;color:var(--muted)}
+  .tag{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap}
+  .t-ok{background:var(--ok-bg);color:var(--ok)} .t-warn{background:var(--warn-bg);color:var(--warn)} .t-no{background:var(--no-bg);color:var(--no)}
+  .card .placeholder{flex:1;border:1.5px dashed var(--line);border-radius:10px;min-height:44px;display:grid;place-items:center;font-size:12px;color:#a6aebb}
+  .actions{display:flex;gap:8px}
+  .btn{flex:1;padding:11px 10px;border-radius:10px;font-weight:700;font-size:14px}
+  .btn-ok{background:var(--ok);color:#fff}
+  .btn-ghost{background:var(--no-bg);color:var(--ink)}
+  .empty{text-align:center;color:var(--muted);padding:48px 16px;font-size:15px}
+  .empty svg{opacity:.35;margin-bottom:10px}
+
+  .fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 20px);height:56px;padding:0 22px;border-radius:28px;
+    background:var(--brand);color:#fff;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(18,48,90,.35);z-index:6}
+
+  /* ---------- Calendário ---------- */
+  .tabs{display:grid;grid-template-columns:1fr 1fr;background:#e6eaf1;border-radius:12px;padding:4px;margin-bottom:14px}
+  .tabs button{padding:10px;border-radius:9px;font-weight:600;color:var(--muted);text-transform:capitalize}
+  .tabs button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .cal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);padding:12px}
+  .cal-sum{display:flex;gap:16px;padding:4px 4px 12px;font-size:13px;color:var(--muted)}
+  .cal-sum b{color:var(--ink);font-size:18px;display:block}
+  .wk,.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .wk div{text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:4px 0;text-transform:uppercase}
+  .day{aspect-ratio:1/1.1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:6px;font-size:14px;font-weight:600;position:relative}
+  .day.out{visibility:hidden}
+  .day.today{outline:2px solid var(--brand-2);outline-offset:-2px}
+  .day.has{background:var(--info-bg)}
+  .day.sel{background:var(--brand);color:#fff}
+  .day .dots{display:flex;gap:3px;margin-top:auto;margin-bottom:6px}
+  .day .dot{width:6px;height:6px;border-radius:50%}
+  .dot.v{background:var(--info)} .dot.c{background:var(--ok)}
+  .day.sel .dot.v{background:#9fc0ff} .day.sel .dot.c{background:#7be0a8}
+  .day .cnt{font-size:10px;font-weight:700;color:var(--info);margin-top:2px}
+  .day.sel .cnt{color:#cfe0ff}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);padding:10px 4px 2px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .day-title{margin:20px 2px 10px;font-size:15px;font-weight:700}
+  .day-title small{display:block;font-weight:500;color:var(--muted);font-size:13px;margin-top:2px}
+
+  /* ---------- Toast / modal ---------- */
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .sheet-bg{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:15;display:flex;align-items:flex-end}
+  .sheet{background:var(--surface);width:100%;border-radius:20px 20px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 20px);max-width:720px;margin:0 auto}
+  .sheet h3{margin:0 0 4px} .sheet p{margin:0 0 16px;color:var(--muted);font-size:14px}
+  .sheet .btn{display:block;width:100%;margin-bottom:10px;padding:14px}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<section id="login">
+  <div class="logo">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 20V14M10 20V9M16 20V4"/><path d="M2 20h20"/></svg>
+  </div>
+  <h1>Vendas Externas</h1>
+  <p>Entre para acompanhar suas visitas e contratos.</p>
+  <form id="loginForm" autocomplete="on">
+    <label class="field"><span>Usuário</span><input id="user" name="username" autocomplete="username" required></label>
+    <label class="field"><span>Senha</span><input id="pass" name="password" type="password" autocomplete="current-password" required></label>
+    <button class="btn-primary" type="submit">Entrar</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</section>
+
+<!-- ================= APP ================= -->
+<section id="app" class="hidden">
+  <header class="top">
+    <button class="icon-btn hidden" id="backBtn" aria-label="Voltar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <h2 id="pageTitle">Início</h2>
+    <button class="icon-btn" id="logoutBtn" aria-label="Sair">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+    </button>
+  </header>
+  <main id="view"></main>
+  <button class="fab hidden" id="fab">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    Novo cliente
+  </button>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   CONFIGURAÇÃO DE ACESSO
+   Troque aqui o usuário e a senha do vendedor.
+   (Login local, sem servidor — quando houver backend,
+    substituir pela autenticação real.)
+   ========================================================= */
+const USERS = [
+  { user: 'vendedor', pass: '1234', nome: 'Vendedor' }
+];
+
+/* ---------------- Dados (salvos no próprio celular) ---------------- */
+const KEY = 'vendas_clientes_v1';
+const SESSION = 'vendas_sessao_v1';
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function save(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
+let clientes = load();
+/* Estrutura de cada cliente:
+   { id, numero, criadoEm, status:'pendente'|'realizada', visitadoEm:'AAAA-MM-DD', contrato:true|false }
+   Os campos de informação do cliente serão adicionados depois. */
+
+const aVisitar  = () => clientes.filter(c => c.status === 'pendente');
+const realizadas = () => clientes.filter(c => c.status === 'realizada');
+const contratos = () => clientes.filter(c => c.status === 'realizada' && c.contrato);
+
+/* ---------------- Utilidades ---------------- */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const brDate = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2000); }
+
+const ICONS = {
+  contrato:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>',
+  visitar:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  cal:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>',
+  vazio:'<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>'
+};
+
+/* ---------------- Login ---------------- */
+function currentUser(){ try{ return JSON.parse(localStorage.getItem(SESSION)); }catch(e){ return null; } }
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const u = $('#user').value.trim().toLowerCase(), p = $('#pass').value;
+  const found = USERS.find(x => x.user.toLowerCase() === u && x.pass === p);
+  if(!found){ $('#loginErr').textContent = 'Usuário ou senha inválidos.'; return; }
+  try{ localStorage.setItem(SESSION, JSON.stringify({ user: found.user, nome: found.nome })); }catch(e){}
+  $('#loginErr').textContent = '';
+  start();
+});
+$('#logoutBtn').addEventListener('click', () => {
+  try{ localStorage.removeItem(SESSION); }catch(e){}
+  location.hash = '';
+  $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pass').value='';
+});
+
+function start(){
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  route();
+}
+
+/* ---------------- Rotas ---------------- */
+window.addEventListener('hashchange', route);
+$('#backBtn').addEventListener('click', () => { location.hash = ''; });
+$('#fab').addEventListener('click', novoCliente);
+
+function route(){
+  if(!currentUser()) return;
+  const r = location.hash.replace('#','');
+  $('#backBtn').classList.toggle('hidden', !r);
+  $('#fab').classList.toggle('hidden', !(r === '' || r === 'visitar'));
+  window.scrollTo(0,0);
+  if(r === 'contratos') return viewContratos();
+  if(r === 'visitar') return viewVisitar();
+  if(r.startsWith('realizadas')) return viewRealizadas();
+  viewHome();
+}
+
+/* ---------------- Página inicial ---------------- */
+function viewHome(){
+  $('#pageTitle').textContent = 'Início';
+  const u = currentUser();
+  $('#view').innerHTML = `
+    <div class="hello">Olá,<b>${u ? u.nome : ''}</b></div>
+    <div class="grid">
+      <button class="kpi k-ok" onclick="location.hash='contratos'">
+        <div class="ic">${ICONS.contrato}</div>
+        <div class="num">${contratos().length}</div>
+        <div class="lbl">Contratos Fechados</div>
+      </button>
+      <button class="kpi k-warn" onclick="location.hash='visitar'">
+        <div class="ic">${ICONS.visitar}</div>
+        <div class="num">${aVisitar().length}</div>
+        <div class="lbl">Clientes Para Visitar</div>
+      </button>
+      <button class="kpi k-info" onclick="location.hash='realizadas'">
+        <div class="ic">${ICONS.cal}</div>
+        <div class="num">${realizadas().length}</div>
+        <div class="lbl">Visitas Realizadas</div>
+      </button>
+    </div>`;
+}
+
+/* ---------------- Contratos fechados ---------------- */
+function viewContratos(){
+  $('#pageTitle').textContent = 'Contratos Fechados';
+  const list = contratos().sort((a,b) => b.visitadoEm.localeCompare(a.visitadoEm));
+  $('#view').innerHTML = list.length ? `<div class="list two">${list.map(c => `
+      <div class="card">
+        <div class="row"><span class="ttl">Cliente ${c.numero}</span></div>
+        <span class="tag t-ok" style="align-self:flex-start">Fechado ${brDate(c.visitadoEm)}</span>
+        <div class="placeholder">informações</div>
+      </div>`).join('')}</div>`
+    : empty('Nenhum contrato fechado ainda.');
+}
+
+/* ---------------- Clientes para visitar (1 card por linha) ---------------- */
+function viewVisitar(){
+  $('#pageTitle').textContent = 'Clientes Para Visitar';
+  const list = aVisitar();
+  $('#view').innerHTML = list.length ? `<div class="list">${list.map(c => `
+      <div class="card">
+        <div class="row"><span class="ttl">Cliente ${c.numero}</span><span class="tag t-warn">A visitar</span></div>
+        <div class="placeholder">informações do cliente</div>
+        <div class="actions"><button class="btn btn-ok" onclick="finalizar('${c.id}')">Finalizar visita</button></div>
+      </div>`).join('')}</div>`
+    : empty('Nenhum cliente para visitar.<br>Toque em “Novo cliente” para adicionar.');
+}
+
+function novoCliente(){
+  const numero = clientes.reduce((m,c) => Math.max(m, c.numero), 0) + 1;
+  clientes.push({ id: 'c' + Date.now(), numero, criadoEm: new Date().toISOString(), status:'pendente', visitadoEm:null, contrato:false });
+  save(clientes);
+  toast('Cliente adicionado');
+  if(location.hash === '#visitar') viewVisitar(); else location.hash = 'visitar';
+}
+
+function finalizar(id){
+  const bg = document.createElement('div');
+  bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet">
+      <h3>Finalizar visita</h3>
+      <p>Como terminou a visita de hoje?</p>
+      <button class="btn btn-ok" data-r="1">Visita realizada — contrato fechado</button>
+      <button class="btn btn-ghost" data-r="0">Visita realizada — sem contrato</button>
+      <button class="btn" data-r="x" style="color:var(--muted)">Cancelar</button>
+    </div>`;
+  bg.addEventListener('click', e => {
+    const r = e.target.dataset && e.target.dataset.r;
+    if(e.target === bg || r === 'x'){ bg.remove(); return; }
+    if(r === undefined) return;
+    const c = clientes.find(x => x.id === id);
+    c.status = 'realizada'; c.contrato = r === '1'; c.visitadoEm = isoDate(new Date());
+    save(clientes); bg.remove();
+    toast(c.contrato ? 'Contrato fechado registrado' : 'Visita registrada');
+    viewVisitar();
+  });
+  document.body.appendChild(bg);
+}
+
+/* ---------------- Visitas realizadas: calendário (mês atual e anterior) ---------------- */
+let calState = null;
+function viewRealizadas(){
+  $('#pageTitle').textContent = 'Visitas Realizadas';
+  const hoje = new Date();
+  const atual = { y: hoje.getFullYear(), m: hoje.getMonth() };
+  const ant = atual.m === 0 ? { y: atual.y - 1, m: 11 } : { y: atual.y, m: atual.m - 1 };
+  if(!calState) calState = { tab: 'atual', sel: isoDate(hoje) };
+  const mes = calState.tab === 'atual' ? atual : ant;
+
+  // agrupa visitas por dia
+  const porDia = {};
+  realizadas().forEach(c => { (porDia[c.visitadoEm] = porDia[c.visitadoEm] || []).push(c); });
+
+  const prefix = `${mes.y}-${pad(mes.m+1)}`;
+  const doMes = realizadas().filter(c => c.visitadoEm.startsWith(prefix));
+  const primeiroDia = new Date(mes.y, mes.m, 1).getDay();
+  const nDias = new Date(mes.y, mes.m + 1, 0).getDate();
+
+  let cells = '';
+  for(let i=0;i<primeiroDia;i++) cells += '<div class="day out"></div>';
+  for(let d=1; d<=nDias; d++){
+    const iso = `${prefix}-${pad(d)}`;
+    const v = porDia[iso] || [];
+    const fech = v.filter(c => c.contrato).length;
+    const cls = ['day', v.length?'has':'', iso===isoDate(hoje)?'today':'', iso===calState.sel?'sel':''].join(' ');
+    cells += `<button class="${cls}" onclick="selDia('${iso}')">${d}
+      ${v.length ? `<span class="cnt">${v.length}</span><span class="dots"><span class="dot v"></span>${fech?'<span class="dot c"></span>':''}</span>` : ''}
+    </button>`;
+  }
+
+  const sel = calState.sel.startsWith(prefix) ? calState.sel : null;
+  const doDia = sel ? (porDia[sel] || []) : [];
+  const [sy,sm,sd] = sel ? sel.split('-').map(Number) : [];
+  const diaSemana = sel ? new Date(sy, sm-1, sd).toLocaleDateString('pt-BR',{weekday:'long'}) : '';
+
+  $('#view').innerHTML = `
+    <div class="tabs">
+      <button class="${calState.tab==='anterior'?'on':''}" onclick="trocaMes('anterior')">${MESES[ant.m]} ${ant.y}</button>
+      <button class="${calState.tab==='atual'?'on':''}" onclick="trocaMes('atual')">${MESES[atual.m]} ${atual.y}</button>
+    </div>
+    <div class="cal">
+      <div class="cal-sum">
+        <div><b>${doMes.length}</b>visitas no mês</div>
+        <div><b>${doMes.filter(c=>c.contrato).length}</b>contratos fechados</div>
+      </div>
+      <div class="wk"><div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div></div>
+      <div class="days">${cells}</div>
+      <div class="legend"><span><i class="dot v" style="display:inline-block;width:8px;height:8px;border-radius:50%"></i>Visita</span><span><i class="dot c" style="display:inline-block;width:8px;height:8px;border-radius:50%"></i>Contrato fechado</span></div>
+    </div>
+    ${sel ? `
+      <div class="day-title">${sd} de ${MESES[sm-1]} de ${sy}<small>${diaSemana} · ${doDia.length} visita(s) · ${doDia.filter(c=>c.contrato).length} contrato(s)</small></div>
+      ${doDia.length ? `<div class="list">${doDia.map(c => `
+        <div class="card">
+          <div class="row"><span class="ttl">Cliente ${c.numero}</span>
+            ${c.contrato ? '<span class="tag t-ok">Contrato fechado</span>' : '<span class="tag t-no">Sem contrato</span>'}</div>
+          <div class="placeholder">informações</div>
+        </div>`).join('')}</div>` : '<div class="empty" style="padding:24px">Nenhuma visita neste dia.</div>'}
+    ` : '<div class="empty" style="padding:24px">Selecione um dia no calendário.</div>'}
+  `;
+}
+function trocaMes(t){ calState.tab = t; calState.sel = ''; viewRealizadas(); }
+function selDia(iso){ calState.sel = iso; viewRealizadas(); }
+
+function empty(msg){ return `<div class="empty">${ICONS.vazio}<div>${msg}</div></div>`; }
+
+/* ---------------- Inicialização ---------------- */
+if(currentUser()) start();
+if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+</script>
+</body>
+</html>
