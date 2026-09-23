@@ -1,6 +1,6 @@
 // Service worker: permite instalar no celular e abrir o app sem internet
 // Troque o número da versão sempre que publicar uma atualização.
-const CACHE = 'cv-vendas-v2';
+const CACHE = 'cv-vendas-v3';
 const FILES = ['./', './index.html', './manifest.json', './logo.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
 
 self.addEventListener('install', e => {
