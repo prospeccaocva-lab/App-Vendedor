@@ -1,8 +1,8 @@
 // Service worker: permite instalar no celular e abrir o app sem internet
 // Troque o número da versão sempre que publicar uma atualização.
-const CACHE = 'cv-vendas-v4';
-const FILES = ['./', './index.html', './manifest.json', './logo.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
-  './lib/jspdf.umd.min.js', './modelo/cabecalho.jpg', './modelo/rodape.jpg', './modelo/marca-dagua.jpg'];
+const CACHE = 'cv-vendas-v7';
+const FILES = ['./', './index.html', './manifest.json', './logo.svg', './icon-192.png', './icon-512.png', './icon-180.png',
+  './jspdf.umd.min.js', './cabecalho.jpg', './rodape.jpg', './marca-dagua.jpg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));

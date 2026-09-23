@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CV Vendas">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -53,6 +53,8 @@
   .sigbox.assinado .sigph{display:none}
   .sigclear{color:#fff;font-size:13px;font-weight:600;padding:8px 2px;opacity:.85;text-decoration:underline}
   button:disabled{opacity:.6}
+  .sync{text-align:center;color:var(--muted);font-size:12.5px;margin-top:22px}
+  .sync b{font-weight:600}
   .lerr{color:#ffe0e0;background:rgba(214,69,69,.25);border-radius:10px;padding:0;font-size:14px;margin-top:12px}
   .lerr:not(:empty){padding:10px 12px}
 
@@ -291,19 +293,21 @@
 <input type="file" id="fileGaleria" accept="image/*" class="hidden">
 <div class="toast" id="toast"></div>
 
-<script src="lib/jspdf.umd.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-// Meta mensal de contratos. PROVISÓRIO: quando o dashboard do gestor
-// estiver pronto, este valor virá de lá. Use null para "meta não definida".
-const META_MENSAL = 10;
-const VERSAO = '4';
+const VERSAO = '7';
 
-// Envio de e-mail da recuperação de senha (EmailJS – www.emailjs.com).
-// Preencha com os dados da sua conta EmailJS. Enquanto estiver vazio, a recuperação avisa que não está configurada.
-const EMAILJS = { serviceId: '', templateId: '', publicKey: '' };
+// Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
+// url: link do "App da Web" gerado ao implantar o script (termina em /exec).
+// chave: a mesma chave escrita no código do Apps Script (CHAVE). Não compartilhe.
+const GOOGLE = { url: 'https://script.google.com/macros/s/AKfycbyKfrfeTPq8MrBbIGsZp54_6l8yPKWDV6omrG7GCBlrfpzkTktzhdd8gUBlSdFivvGU/exec', chave: 'cv-blAu-COqfd5KLKr-ESkMPT7Dl3BZXsOH' };
+
+// Meta usada só enquanto a planilha não estiver conectada. Com a planilha,
+// a meta vem da aba "Metas" (definida pelo gestor).
+const META_PADRAO = 10;
 
 /* =========================================================
    ARMAZENAMENTO
@@ -336,7 +340,7 @@ let sessao = lsGet(K_SESSION, null);
 let clientes = [];
 const kClientes = () => 'cv_clientes_' + sessao.cpf;
 const loadClientes = () => { clientes = lsGet(kClientes(), []); };
-const saveClientes = () => lsSet(kClientes(), clientes);
+const saveClientes = () => { const ok = lsSet(kClientes(), clientes); agendarSinc(); return ok; };
 const byId = id => clientes.find(c => c.id === id);
 
 /* =========================================================
@@ -500,7 +504,7 @@ $('#perfilForm').addEventListener('submit', e => {
   entrar(u);
 });
 
-// ---- Recuperar senha: gera 6 números e envia por e-mail (EmailJS) ----
+// ---- Recuperar senha: gera 6 números e envia pelo Gmail da empresa (Apps Script) ----
 $('#recForm').addEventListener('submit', async e => {
   e.preventDefault();
   const err = m => $('#recErr').textContent = m, cpf = digits($('#rCpf').value);
@@ -509,16 +513,13 @@ $('#recForm').addEventListener('submit', async e => {
   const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === cpf);
   if (!u) return err('Este CPF não tem cadastro neste aparelho.');
   if (!u.email) return err('Este cadastro não tem e-mail. Fale com o seu gestor.');
-  if (!EMAILJS.serviceId || !EMAILJS.templateId || !EMAILJS.publicKey) return err('O envio de e-mail ainda não foi configurado. Fale com o seu gestor.');
+  if (!GOOGLE.url) return err('O envio de e-mail ainda não foi configurado no aplicativo. Fale com o seu gestor.');
   if (!navigator.onLine) return err('Sem internet. Conecte-se para recuperar a senha.');
   const n = new Uint32Array(1); crypto.getRandomValues(n);
   const nova = String(n[0] % 1000000).padStart(6, '0');
   const btn = $('#recBtn'); btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    const r = await fetch('https://api.emailjs.com/api/v1.0/email/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service_id: EMAILJS.serviceId, template_id: EMAILJS.templateId, user_id: EMAILJS.publicKey,
-        template_params: { to_email: u.email, to_name: u.nome.split(' ')[0], nova_senha: nova } }) });
-    if (!r.ok) throw new Error(await r.text());
+    await google('recuperarSenha', { email: u.email, nome: u.nome, cpf, senha: nova });
     u.hash = await hash(cpf + ':' + nova); lsSet(K_USERS, users); // só troca a senha depois que o e-mail saiu
     const [a, dom] = u.email.split('@');
     $('#recOk').textContent = `Nova senha enviada para ${a.slice(0, 2)}***@${dom}. Confira sua caixa de entrada (e o spam).`;
@@ -544,6 +545,7 @@ function start(){
   loadClientes();
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   route();
+  buscarMeta(); sincronizar();
 }
 
 /* =========================================================
@@ -586,8 +588,14 @@ const realizadas = () => clientes.filter(c => c.status === 'realizada');
 const contratos = () => clientes.filter(c => c.resultado === 'contrato');
 const contratosMes = () => contratos().filter(c => (c.contratoEm || '').startsWith(mesAtual()));
 
+function metaDoMes(){
+  if (!GOOGLE.url) return META_PADRAO;
+  const m = lsGet(`cv_meta_${sessao.cpf}_${mesAtual()}`, null);
+  return m && m.meta > 0 ? m.meta : null;
+}
 function metaHTML(){
   const hoje = new Date(), feitos = contratosMes().length, nomeMes = MESES[hoje.getMonth()];
+  const META_MENSAL = metaDoMes();
   if (!META_MENSAL) return `<div class="goal g-none">
       <div class="gt"><span>Meta de ${nomeMes}</span><span class="pct">a definir</span></div>
       <div class="gnum"><b>${feitos}</b><span>contratos fechados</span></div>
@@ -633,7 +641,8 @@ function viewHome(){
         <div class="n">${contratosMes().length}</div><span class="chev">${I.chev}</span>
       </button>
     </div>
-    <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:22px">Versão ${VERSAO}</p>`;
+    <p class="sync" id="syncInfo">${syncTexto()}</p>
+    <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:6px">Versão ${VERSAO}</p>`;
 }
 
 /* =========================================================
@@ -730,7 +739,7 @@ function viewForm(id){
       if (m && !first) first = el;
     });
     if (first) { first.scrollIntoView({ behavior:'smooth', block:'center' }); toast('Confira os campos destacados'); return; }
-    if (c) { c.dados = dados; saveClientes(); toast('Cliente atualizado'); location.hash = 'cliente/' + c.id; return; }
+    if (c) { c.dados = dados; saveClientes(); toast('Cliente atualizado'); location.hash = ''; return; }
     clientes.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), criadoEm: new Date().toISOString(), status: 'pendente',
       dados, visita: { modalidade: null, contato: '', atendimento: '', motivo: '', motivoOutro: '', obs: '', checkin: null, fotos: [] },
       proposta: null, resultado: null, visitadoEm: null, contratoEm: null });
@@ -979,13 +988,14 @@ const periodicidade = p => ({ '1x ao mês': 'Mensal', '2x ao mês': 'Quinzenal (
 const imgCache = {};
 async function imgData(url){
   if (imgCache[url]) return imgCache[url];
-  const b = await (await fetch(url)).blob();
+  const r = await fetch(url); if (!r.ok) throw new Error('Arquivo não encontrado no site: ' + url);
+  const b = await r.blob();
   return imgCache[url] = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
 }
 
 async function gerarPropostaPDF(c){
   const { jsPDF } = window.jspdf;
-  const [cab, rod, marca] = await Promise.all(['modelo/cabecalho.jpg', 'modelo/rodape.jpg', 'modelo/marca-dagua.jpg'].map(imgData));
+  const [cab, rod, marca] = await Promise.all(['cabecalho.jpg', 'rodape.jpg', 'marca-dagua.jpg'].map(imgData));
   const p = c.proposta, d = c.dados, vend = usuarioAtual();
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const L = 85, R = 540, FS = 10, LH = 12.9, MAXY = 740;
@@ -1101,7 +1111,16 @@ async function mostrarPDF(id, aoFechar){
   const c = byId(id);
   const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Gerando a proposta em PDF…'; document.body.appendChild(b);
   let arq;
-  try { arq = await gerarPropostaPDF(c); } catch (e) { b.remove(); toast('Não foi possível gerar o PDF'); if (aoFechar) aoFechar(); return; }
+  try {
+    if (!window.jspdf) throw new Error('Arquivo não encontrado no site: jspdf.umd.min.js');
+    arq = await gerarPropostaPDF(c);
+  } catch (e) {
+    b.remove();
+    sheet(`<h3>Não foi possível gerar o PDF</h3><div class="missing">${esc(e.message || e)}</div>
+      <p class="hint">A proposta ficou salva. Você pode gerar o PDF depois pelo botão “PDF da proposta”.</p>
+      <button class="btn btn-green" data-close>Entendi</button>`, aoFechar);
+    return;
+  }
   b.remove();
   const file = new File([arq.blob], arq.nome, { type: 'application/pdf' });
   const podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [file] }));
@@ -1159,10 +1178,11 @@ function abrirProposta(id, depois){
     np.data = new Date().toISOString();
     c.proposta = np; saveClientes(); bg.remove(); toast('Proposta salva');
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
-    mostrarPDF(id, depois); // gera o PDF no modelo da empresa e oferece o envio
+    mostrarPDF(id, depois || irInicio); // gera o PDF e, ao fechar, volta para a tela principal
   };
 }
 
+const irInicio = () => { location.hash = ''; };
 /* ---------- Finalizar visita ---------- */
 function pendencias(c){
   const v = c.visita, p = [];
@@ -1196,13 +1216,13 @@ function finalizar(id, resultado){
   c.contratoEm = resultado === 'contrato' ? hoje : null;
   saveClientes();
   toast(resultado === 'contrato' ? 'Contrato fechado registrado! 🎉' : 'Visita registrada com proposta enviada');
-  location.hash = 'visitar';
+  irInicio();
 }
 function converterContrato(id){
   const c = byId(id);
   if (!confirm(`Registrar contrato fechado hoje com ${c.dados.nome}?`)) return;
   c.resultado = 'contrato'; c.contratoEm = isoDate(new Date()); saveClientes();
-  toast('Contrato fechado registrado! 🎉'); viewCliente(id);
+  toast('Contrato fechado registrado! 🎉'); irInicio();
 }
 
 /* ---------- Cliente com visita realizada (somente leitura) ---------- */
@@ -1280,6 +1300,81 @@ function viewRealizadas(){
     ${sel ? titulo + (doDia.length ? `<div class="list">${doDia.map(clienteCard).join('')}</div>` : '<div class="empty" style="padding:24px">Nenhuma visita neste dia.</div>')
           : '<div class="empty" style="padding:24px">Toque em um dia do calendário.</div>'}`;
 }
+
+
+/* =========================================================
+   SINCRONIZAÇÃO COM O GOOGLE (planilha, Drive e Gmail)
+   O app compara o que tem no celular com o que já foi enviado
+   e manda só o que mudou. Sem internet, tenta de novo depois.
+   ========================================================= */
+async function google(acao, dados){
+  const r = await fetch(GOOGLE.url, { method: 'POST', body: JSON.stringify({ chave: GOOGLE.chave, acao, dados }) }); // text/plain: sem preflight
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.erro || 'Erro no Google');
+  return j;
+}
+const kSinc = () => 'cv_sinc_' + sessao.cpf;
+const hashStr = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); };
+let sincRodando = false, sincTimer = null, sincErro = '';
+const agendarSinc = () => { clearTimeout(sincTimer); sincTimer = setTimeout(sincronizar, 1500); };
+
+function pendentesSinc(){
+  if (!sessao) return 0;
+  const st = lsGet(kSinc(), { vend: null, cli: {}, fotos: {} }); let n = 0;
+  const u = usuarioAtual(); if (st.vend !== hashStr(JSON.stringify([u.nome, u.email]))) n++;
+  clientes.forEach(c => { if (st.cli[c.id] !== hashStr(JSON.stringify(c))) n++; c.visita.fotos.forEach(f => { if (!st.fotos[f.id]) n++; }); });
+  const vivas = new Set(clientes.flatMap(c => c.visita.fotos.map(f => f.id)));
+  Object.keys(st.fotos).forEach(fid => { if (!vivas.has(fid)) n++; });
+  return n;
+}
+function syncTexto(){
+  if (!GOOGLE.url) return 'Planilha do Google ainda não conectada';
+  const n = pendentesSinc();
+  if (sincRodando) return '⟳ Enviando dados para a planilha…';
+  if (!n) return '✓ Tudo enviado para a planilha';
+  return `<b>${n}</b> ${n > 1 ? 'itens aguardando' : 'item aguardando'} envio${!navigator.onLine ? ' (sem internet)' : sincErro ? ' (vamos tentar de novo)' : ''}`;
+}
+const atualizarSyncInfo = () => { const el = $('#syncInfo'); if (el) el.innerHTML = syncTexto(); };
+
+async function sincronizar(){
+  if (!GOOGLE.url || !sessao || sincRodando || !navigator.onLine) { atualizarSyncInfo(); return; }
+  sincRodando = true; sincErro = ''; atualizarSyncInfo();
+  const cpf = sessao.cpf, st = lsGet(kSinc(), { vend: null, cli: {}, fotos: {} });
+  const salvar = () => lsSet(kSinc(), st);
+  try {
+    const u = usuarioAtual(), hv = hashStr(JSON.stringify([u.nome, u.email]));
+    if (st.vend !== hv) { await google('vendedor', { cpf, nome: u.nome, email: u.email, criadoEm: u.criadoEm || '' }); st.vend = hv; salvar(); }
+    for (const c of clientes) {
+      if (!sessao || sessao.cpf !== cpf) break;
+      const h = hashStr(JSON.stringify(c));
+      if (st.cli[c.id] !== h) { await google('cliente', { vendedor: { cpf, nome: u.nome }, cliente: c }); st.cli[c.id] = h; salvar(); }
+      for (const f of c.visita.fotos) {
+        if (st.fotos[f.id]) continue;
+        const data = await FotoDB.get(f.id); if (!data) continue;
+        const r = await google('foto', { clienteId: c.id, clienteNome: c.dados.nome, vendedor: u.nome, fotoId: f.id, em: f.em,
+          modalidade: c.visita.modalidade, base64: data.split(',')[1] });
+        st.fotos[f.id] = r.url || true; salvar();
+      }
+    }
+    const vivas = new Set(clientes.flatMap(c => c.visita.fotos.map(f => f.id)));
+    for (const fid of Object.keys(st.fotos)) {
+      if (vivas.has(fid)) continue;
+      await google('removerFoto', { fotoId: fid }); delete st.fotos[fid]; salvar();
+    }
+  } catch (e) { sincErro = e.message || 'erro'; }
+  sincRodando = false; atualizarSyncInfo();
+  if (sincErro) { clearTimeout(sincTimer); sincTimer = setTimeout(sincronizar, 60000); }
+}
+async function buscarMeta(){
+  if (!GOOGLE.url || !sessao || !navigator.onLine) return;
+  try {
+    const r = await google('meta', { cpf: sessao.cpf, mes: mesAtual() });
+    lsSet(`cv_meta_${sessao.cpf}_${mesAtual()}`, { meta: Number(r.meta) || null, em: Date.now() });
+    if (location.hash.replace('#', '') === '') viewHome();
+  } catch (e) {}
+}
+window.addEventListener('online', () => { sincronizar(); buscarMeta(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { sincronizar(); buscarMeta(); } });
 
 /* =========================================================
    INÍCIO
