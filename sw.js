@@ -1,6 +1,7 @@
 // Service worker: permite instalar no celular e abrir o app sem internet
-const CACHE = 'vendas-v1';
-const FILES = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
+// Troque o número da versão sempre que publicar uma atualização.
+const CACHE = 'cv-vendas-v2';
+const FILES = ['./', './index.html', './manifest.json', './logo.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -12,7 +13,9 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Rede primeiro (pega sempre a versão mais nova); sem internet, usa o que está salvo
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone();
