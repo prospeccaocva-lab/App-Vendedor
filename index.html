@@ -311,7 +311,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '8';
+const VERSAO = '9';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -815,12 +815,14 @@ function propostaHTML(c, editavel){
   if (!p) return `<div class="sec"><h3>Proposta</h3>
     <p class="hint" style="margin:0 0 12px">Preço, frequência de coleta, franquia e excedente.</p>
     <button class="btn btn-lime" onclick="abrirProposta('${c.id}')">Formular proposta</button></div>`;
-  return `<div class="sec"><h3>Proposta ${editavel ? `<button class="linkbtn" onclick="abrirProposta('${c.id}')">Editar</button>` : ''}</h3>
+  return `<div class="sec"><h3>Proposta${p.revisao ? ` <small style="font-weight:500;color:var(--muted);font-size:12px">revisada ${p.revisao}x</small>` : ''} ${editavel ? `<button class="linkbtn" onclick="abrirProposta('${c.id}')">Editar proposta</button>` : ''}</h3>
     <div class="prop-sum">
       <div><small>Preço</small><b>${esc(p.preco)}</b></div>
       <div><small>Frequência</small><b>${esc(freqTxt(p))}</b></div>
       <div><small>Franquia</small><b>${esc(p.franquia)} kg/mês</b></div>
       <div><small>Excedente</small><b>${esc(p.excedente)}/kg</b></div>
+      <div><small>Vigência</small><b>${esc(p.vigencia || 12)} meses</b></div>
+      <div><small>Data da proposta</small><b>${p.data ? brDate(p.data) : '—'}</b></div>
     </div>
     <button class="btn btn-soft" style="margin-top:12px" onclick="mostrarPDF('${c.id}')">${I.doc} PDF da proposta / enviar pelo WhatsApp</button></div>`;
 }
@@ -1137,7 +1139,7 @@ async function gerarPropostaPDF(c){
    'Certificado mensal de tratamento dos resíduos destinados;',
    'Comprovante de coleta em forma digital, reduzindo os impactos ambientais;',
    'Certificado de Tratamento;',
-   'O contrato terá vigência por 12 meses.'].forEach(bonus);
+   `O contrato terá vigência por ${Number(p.vigencia) || 12} (${extenso(Number(p.vigencia) || 12)}) meses.`].forEach(bonus);
   y += LH * 0.6;
 
   par([T('3) ', { b: 1 }), T('Considerações:', { b: 1, u: 1 })], { after: 6 });
@@ -1202,8 +1204,9 @@ function sheet(html, aoFechar){
 
 /* ---------- Formular proposta ---------- */
 function abrirProposta(id, depois){
-  const c = byId(id), p = c.proposta || { preco:'', frequencia:'', frequenciaOutro:'', franquia:'', excedente:'' };
-  const bg = sheet(`<h3>Formular proposta</h3><p class="sub">${esc(c.dados.nome)}</p>
+  const c = byId(id), p = c.proposta || { preco:'', frequencia:'', frequenciaOutro:'', franquia:'', excedente:'', vigencia: 12 };
+  const revisao = !!c.proposta && c.status === 'realizada';
+  const bg = sheet(`<h3>${c.proposta ? 'Editar proposta' : 'Formular proposta'}</h3><p class="sub">${esc(c.dados.nome)}${revisao ? ' · a proposta anterior fica guardada no histórico' : ''}</p>
     <form id="propForm" novalidate>
       <label class="f" data-k="preco"><span>Preço <i>*</i></span><input name="preco" inputmode="numeric" placeholder="R$ 0,00" value="${esc(p.preco)}"><div class="msg">Informe o preço</div></label>
       <div class="f" data-k="frequencia"><span>Frequência de coleta <i>*</i></span>
@@ -1214,6 +1217,7 @@ function abrirProposta(id, depois){
         <label class="f" data-k="franquia"><span>Franquia <i>*</i></span><div class="suffix"><input name="franquia" inputmode="numeric" placeholder="0" value="${esc(p.franquia)}"><em>kg/mês</em></div><div class="msg">Informe a franquia</div></label>
         <label class="f" data-k="excedente"><span>Excedente <i>*</i></span><div class="suffix"><input name="excedente" inputmode="numeric" placeholder="R$ 0,00" value="${esc(p.excedente)}"><em>/kg</em></div><div class="msg">Informe o excedente</div></label>
       </div>
+      <label class="f" data-k="vigencia"><span>Prazo de vigência do contrato <i>*</i></span><div class="suffix"><input name="vigencia" inputmode="numeric" placeholder="12" value="${esc(p.vigencia || 12)}"><em>meses</em></div><div class="msg">Informe a vigência (1 a 120 meses)</div></label>
       <button class="btn btn-green" type="submit" style="margin-top:6px">Salvar proposta</button>
       <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
     </form>`);
@@ -1221,6 +1225,7 @@ function abrirProposta(id, depois){
   f.preco.oninput = e => e.target.value = maskMoney(e.target.value);
   f.excedente.oninput = e => e.target.value = maskMoney(e.target.value);
   f.franquia.oninput = e => e.target.value = maskInt(e.target.value);
+  f.vigencia.oninput = e => e.target.value = digits(e.target.value).slice(0, 3);
   f.addEventListener('input', e => e.target.closest('.f')?.classList.remove('bad'));
   f.querySelectorAll('[data-freq]').forEach(b => b.onclick = () => {
     freq = b.dataset.freq; f.querySelectorAll('[data-freq]').forEach(x => x.classList.toggle('on', x === b));
@@ -1229,12 +1234,14 @@ function abrirProposta(id, depois){
   });
   f.onsubmit = e => {
     e.preventDefault();
-    const np = { preco: f.preco.value, frequencia: freq, frequenciaOutro: f.frequenciaOutro.value.trim(), franquia: f.franquia.value, excedente: f.excedente.value };
-    const bad = { preco: !np.preco, frequencia: !np.frequencia, frequenciaOutro: np.frequencia === 'Outros' && !np.frequenciaOutro, franquia: !np.franquia, excedente: !np.excedente };
+    const np = { preco: f.preco.value, frequencia: freq, frequenciaOutro: f.frequenciaOutro.value.trim(), franquia: f.franquia.value, excedente: f.excedente.value, vigencia: Number(f.vigencia.value) };
+    const bad = { preco: !np.preco, frequencia: !np.frequencia, frequenciaOutro: np.frequencia === 'Outros' && !np.frequenciaOutro, franquia: !np.franquia, excedente: !np.excedente,
+      vigencia: !(np.vigencia >= 1 && np.vigencia <= 120) };
     Object.entries(bad).forEach(([k, b]) => f.querySelector(`[data-k="${k}"]`).classList.toggle('bad', b));
     if (Object.values(bad).some(Boolean)) return;
     np.data = new Date().toISOString();
-    c.proposta = np; saveClientes(); bg.remove(); toast('Proposta salva');
+    if (c.proposta) { c.propostaHistorico = (c.propostaHistorico || []).concat([{ ...c.proposta, substituidaEm: np.data }]); np.revisao = (c.proposta.revisao || 0) + 1; }
+    c.proposta = np; saveClientes(); bg.remove(); toast(np.revisao ? 'Proposta atualizada' : 'Proposta salva');
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
     mostrarPDF(id, depois); // gera o PDF; ao fechar, continua no cliente (ou segue a finalização)
   };
@@ -1367,7 +1374,7 @@ function viewClienteRealizado(c){
     ${v.checkin ? `<div style="margin-top:14px">${checkinHTML(v)}</div>` : ''}
     ${v.fotos.length ? `<div class="photos" style="margin-top:14px">${v.fotos.map(f => `<div class="ph"><img data-foto="${f.id}" alt="" onclick="verFoto('${f.id}')"></div>`).join('')}</div>` : ''}
     </div>` : ''}
-    ${c.proposta ? propostaHTML(c, false) : ''}
+    ${c.proposta ? propostaHTML(c, c.resultado === 'proposta') : ''}
     ${c.resultado === 'proposta' ? `<div class="bottom-bar"><button class="btn btn-green" onclick="converterContrato('${c.id}')">Cliente aceitou: registrar contrato fechado</button></div>` : ''}`;
   carregarFotos();
 }
