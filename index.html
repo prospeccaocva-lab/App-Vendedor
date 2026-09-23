@@ -172,9 +172,14 @@
   .hdias{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
   .hdia{border:1.5px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
   .hdia-t{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .hgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .hgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .hgrid label{min-width:0;display:block}
+  .hbox{border:1.5px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+  .hbox-c{border-color:var(--lime);background:var(--lime-soft)}
+  .hbox-t{font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px} .hbox-t small{font-weight:500;color:var(--muted)} .hbox-t .linkbtn{margin-left:auto}
   .hgrid label small{display:block;font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:3px}
-  .hgrid input{width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--line);font-size:16px;background:#fff}
+  .hgrid input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;height:46px;padding:0 10px;border-radius:10px;border:1.5px solid var(--line);font-size:16px;background:#fff;color:var(--ink);text-align:left}
+  .hgrid input::-webkit-date-and-time-value{text-align:left;margin:0}
   .hdica{display:block;color:var(--muted);font-size:12px;margin-top:6px}
   .checkin{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:var(--ok-bg)}
   .checkin .pin{width:40px;height:40px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;flex:none}
@@ -321,7 +326,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '11';
+const VERSAO = '12';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -934,67 +939,85 @@ function setVisita(k, val, rerender){
 function setMotivo(m){ setVisita('motivo', m, true); }
 
 /* ---------- Dias e horário de atendimento ---------- */
+// Formato: { dias: {seg:true,...}, padrao: {abre, almIni, almFim, fecha}, custom: { ter: {...} } }
 const DIAS = [['seg', 'Segunda', 'Seg'], ['ter', 'Terça', 'Ter'], ['qua', 'Quarta', 'Qua'], ['qui', 'Quinta', 'Qui'], ['sex', 'Sexta', 'Sex']];
+const vazioH = () => ({ abre: '', almIni: '', almFim: '', fecha: '' });
+function normalizarHorario(h){
+  if (!h) return { dias: {}, padrao: vazioH(), custom: {} };
+  if (h.dias) return { dias: { ...h.dias }, padrao: { ...vazioH(), ...h.padrao }, custom: JSON.parse(JSON.stringify(h.custom || {})) };
+  // formato antigo (um horário por dia): o 1º dia vira o padrão, os diferentes viram personalizados
+  const n = { dias: {}, padrao: vazioH(), custom: {} }; let base = null;
+  DIAS.forEach(([k]) => { const d = h[k]; if (!d || !d.aberto) return; n.dias[k] = true;
+    const t = { abre: d.abre, almIni: d.almIni, almFim: d.almFim, fecha: d.fecha };
+    if (!base) { base = t; n.padrao = { ...t }; } else if (JSON.stringify(t) !== JSON.stringify(base)) n.custom[k] = t; });
+  return n;
+}
+const horarioDoDia = (h, k) => h.custom && h.custom[k] ? h.custom[k] : h.padrao;
 const faixaDia = d => d.almIni && d.almFim ? `${d.abre}–${d.almIni} e ${d.almFim}–${d.fecha}` : `${d.abre}–${d.fecha}`;
 const juntarNomes = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : l[0];
-// Agrupa dias com o mesmo horário: "Seg, Qua e Sex: 08:00–12:00 e 13:00–18:00 · Ter e Qui: 08:00–10:00"
-function gruposHorario(h){
-  const g = [];
-  DIAS.forEach(([k, , curto]) => { const d = h[k]; if (!d || !d.aberto) return;
-    const f = faixaDia(d), x = g.find(y => y.f === f); x ? x.dias.push(curto) : g.push({ f, dias: [curto] }); });
+function gruposHorario(hr){
+  const h = normalizarHorario(hr), g = [];
+  DIAS.forEach(([k, , curto]) => { if (!h.dias[k]) return; const f = faixaDia(horarioDoDia(h, k)), x = g.find(y => y.f === f); x ? x.dias.push(curto) : g.push({ f, dias: [curto] }); });
   return g;
 }
-const resumoHorario = h => { const g = gruposHorario(h); return g.length ? g.map(x => `${juntarNomes(x.dias)}: ${x.f}`).join(' · ') : 'Fechado de segunda a sexta'; };
+const horarioCompleto = hr => { const h = normalizarHorario(hr); return DIAS.some(([k]) => h.dias[k]) && !!h.padrao.abre && !!h.padrao.fecha; };
+const resumoHorario = h => { const g = gruposHorario(h); return g.length ? g.map(x => `${juntarNomes(x.dias)}: ${x.f}`).join(' · ') : ''; };
 const resumoHorarioHTML = h => { const g = gruposHorario(h);
-  return g.length ? g.map(x => `<span class="hlin"><b>${juntarNomes(x.dias)}</b> ${x.f}</span>`).join('') + '<small>Toque para alterar</small>' : '<span class="hlin">Fechado de segunda a sexta</span><small>Toque para alterar</small>'; };
+  return (g.length ? g.map(x => `<span class="hlin"><b>${juntarNomes(x.dias)}</b> ${x.f}</span>`).join('') : '<span class="hlin">Nenhum dia marcado</span>') + '<small>Toque para alterar</small>'; };
 
 function abrirHorario(id){
-  const c = byId(id);
-  const h = JSON.parse(JSON.stringify(c.visita.horario || {}));
-  DIAS.forEach(([k]) => { h[k] = h[k] || { aberto: false, abre: '', almIni: '', almFim: '', fecha: '' }; });
-  const bg = sheet(`<h3>Dias e horário de atendimento</h3><p class="sub">Marque os dias em que o cliente <b>estará aberto</b> e o horário de cada dia.</p>
-    <div class="hdias" data-dias></div><div data-lista></div>
-    <div class="missing hidden" data-erro></div>
-    <button class="btn btn-green" data-ok>Salvar horário</button>
+  const c = byId(id), h = normalizarHorario(c.visita.horario);
+  const campos = (pref, t) => `<div class="hgrid">
+      <label><small>Abertura</small><input type="time" data-c="${pref}abre" value="${t.abre}"></label>
+      <label><small>Fechamento</small><input type="time" data-c="${pref}fecha" value="${t.fecha}"></label>
+      <label><small>Início almoço</small><input type="time" data-c="${pref}almIni" value="${t.almIni}"></label>
+      <label><small>Retorno almoço</small><input type="time" data-c="${pref}almFim" value="${t.almFim}"></label>
+    </div>`;
+  const bg = sheet(`<h3>Dias e horário de atendimento</h3><p class="sub">1. Marque os dias em que o cliente <b>estará aberto</b>. 2. Informe o horário uma vez só.</p>
+    <div class="hdias" data-dias></div>
+    <div class="hbox"><div class="hbox-t">Horário de funcionamento</div><div data-padrao></div><small class="hdica">Sem pausa para almoço? Deixe os campos de almoço vazios.</small></div>
+    <div data-custom></div>
+    <button type="button" class="btn btn-soft" data-pers>⚙ Personalizar horário de um dia</button>
+    <div class="missing hidden" data-erro style="margin-top:12px"></div>
+    <button class="btn btn-green" data-ok style="margin-top:12px">Salvar horário</button>
     <button class="btn btn-ghost" data-close>Cancelar</button>`);
+  const ler = () => bg.querySelectorAll('[data-c]').forEach(i => { const [pref, campo] = i.dataset.c.split('.');
+    if (pref === 'p') h.padrao[campo] = i.value; else if (h.custom[pref]) h.custom[pref][campo] = i.value; });
   const desenhar = () => {
-    bg.querySelector('[data-dias]').innerHTML = DIAS.map(([k, nome]) => `<button type="button" class="chip ${h[k].aberto ? 'on' : ''}" data-dia="${k}">${nome}</button>`).join('');
-    const abertos = DIAS.filter(([k]) => h[k].aberto);
-    bg.querySelector('[data-lista]').innerHTML = abertos.length ? abertos.map(([k, nome]) => { const d = h[k];
-      return `<div class="hdia" data-k="${k}">
-        <div class="hdia-t"><b>${nome}</b>${abertos.length > 1 ? `<button type="button" class="linkbtn" data-copiar="${k}">Copiar para os outros dias</button>` : ''}</div>
-        <div class="hgrid">
-          <label><small>Abertura</small><input type="time" data-c="abre" value="${d.abre}"></label>
-          <label><small>Início almoço</small><input type="time" data-c="almIni" value="${d.almIni}"></label>
-          <label><small>Retorno almoço</small><input type="time" data-c="almFim" value="${d.almFim}"></label>
-          <label><small>Fechamento</small><input type="time" data-c="fecha" value="${d.fecha}"></label>
-        </div>
-        <small class="hdica">Sem pausa para almoço? Deixe os dois campos de almoço vazios.</small></div>`; }).join('')
-      : '<p class="hint" style="margin:6px 0 14px">Nenhum dia marcado. Toque nos dias acima.</p>';
-    bg.querySelectorAll('[data-dia]').forEach(b => b.onclick = () => { ler(); const d = h[b.dataset.dia]; d.aberto = !d.aberto;
-      // novo dia aberto já vem com o horário do primeiro dia preenchido
-      if (d.aberto && !d.abre) { const mod = DIAS.map(([k]) => h[k]).find(x => x.aberto && x.abre); if (mod) Object.assign(d, { abre: mod.abre, almIni: mod.almIni, almFim: mod.almFim, fecha: mod.fecha }); }
-      desenhar(); });
-    bg.querySelectorAll('[data-copiar]').forEach(b => b.onclick = () => { ler(); const o = h[b.dataset.copiar];
-      DIAS.forEach(([k]) => { if (h[k].aberto && k !== b.dataset.copiar) Object.assign(h[k], { abre: o.abre, almIni: o.almIni, almFim: o.almFim, fecha: o.fecha }); });
-      desenhar(); toast('Horário copiado para os outros dias marcados'); });
+    bg.querySelector('[data-dias]').innerHTML = DIAS.map(([k, nome]) => `<button type="button" class="chip ${h.dias[k] ? 'on' : ''}" data-dia="${k}">${nome}</button>`).join('');
+    bg.querySelector('[data-padrao]').innerHTML = campos('p.', h.padrao);
+    const cs = DIAS.filter(([k]) => h.custom[k]);
+    bg.querySelector('[data-custom]').innerHTML = cs.map(([k, nome]) => `<div class="hbox hbox-c"><div class="hbox-t">${nome} <small>(horário diferente)</small>
+        <button type="button" class="linkbtn" data-rmc="${k}">Remover</button></div>${campos(k + '.', h.custom[k])}</div>`).join('');
+    bg.querySelectorAll('[data-dia]').forEach(b => b.onclick = () => { ler(); const k = b.dataset.dia; h.dias[k] = !h.dias[k]; if (!h.dias[k]) delete h.custom[k]; desenhar(); });
+    bg.querySelectorAll('[data-rmc]').forEach(b => b.onclick = () => { ler(); delete h.custom[b.dataset.rmc]; desenhar(); });
   };
-  const ler = () => bg.querySelectorAll('[data-k]').forEach(el => el.querySelectorAll('[data-c]').forEach(i => h[el.dataset.k][i.dataset.c] = i.value));
+  bg.querySelector('[data-pers]').onclick = () => {
+    ler();
+    const livres = DIAS.filter(([k]) => h.dias[k] && !h.custom[k]);
+    if (!livres.length) return toast(DIAS.some(([k]) => h.dias[k]) ? 'Todos os dias marcados já estão personalizados' : 'Marque primeiro os dias de atendimento');
+    const sub = sheet(`<h3>Personalizar horário</h3><p class="sub">Qual dia tem horário diferente?</p>
+      <div class="hdias">${livres.map(([k, nome]) => `<button type="button" class="chip" data-esc="${k}">${nome}</button>`).join('')}</div>
+      <button class="btn btn-ghost" data-close>Cancelar</button>`);
+    sub.querySelectorAll('[data-esc]').forEach(b => b.onclick = () => { h.custom[b.dataset.esc] = { ...h.padrao }; sub.remove(); desenhar();
+      setTimeout(() => bg.querySelector(`[data-c="${b.dataset.esc}.abre"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); });
+  };
   const validar = () => {
-    const erros = [];
-    DIAS.forEach(([k, nome]) => { const d = h[k]; if (!d.aberto) return;
-      if (!d.abre || !d.fecha) return erros.push(`${nome}: informe abertura e fechamento`);
-      if (!!d.almIni !== !!d.almFim) return erros.push(`${nome}: preencha início e retorno do almoço (ou deixe os dois vazios)`);
-      const seq = d.almIni ? [d.abre, d.almIni, d.almFim, d.fecha] : [d.abre, d.fecha];
-      if (seq.some((t, i) => i && t <= seq[i - 1])) erros.push(`${nome}: os horários precisam estar em ordem (abertura → almoço → retorno → fechamento)`); });
+    const erros = [], checa = (nome, t) => {
+      if (!t.abre || !t.fecha) return erros.push(`${nome}: informe abertura e fechamento`);
+      if (!!t.almIni !== !!t.almFim) return erros.push(`${nome}: preencha início e retorno do almoço (ou deixe os dois vazios)`);
+      const seq = t.almIni ? [t.abre, t.almIni, t.almFim, t.fecha] : [t.abre, t.fecha];
+      if (seq.some((x, i) => i && x <= seq[i - 1])) erros.push(`${nome}: horários fora de ordem (abertura → almoço → retorno → fechamento)`); };
+    if (!DIAS.some(([k]) => h.dias[k])) erros.push('Marque pelo menos um dia de atendimento');
+    else { checa('Horário de funcionamento', h.padrao); DIAS.forEach(([k, nome]) => { if (h.custom[k]) checa(nome, h.custom[k]); }); }
     return erros;
   };
   desenhar();
   bg.querySelector('[data-ok]').onclick = () => {
     ler(); const erros = validar(), box = bg.querySelector('[data-erro]');
     if (erros.length) { box.innerHTML = `<ul>${erros.map(e => `<li>${e}</li>`).join('')}</ul>`; box.classList.remove('hidden'); return; }
-    DIAS.forEach(([k]) => { if (!h[k].aberto) h[k] = { aberto: false, abre: '', almIni: '', almFim: '', fecha: '' }; });
-    c.visita.horario = h; c.visita.atendimento = resumoHorario(h); // texto resumido vai para a planilha e o painel
+    Object.keys(h.custom).forEach(k => { if (!h.dias[k] || JSON.stringify(h.custom[k]) === JSON.stringify(h.padrao)) delete h.custom[k]; });
+    c.visita.horario = h; c.visita.atendimento = resumoHorario(h); // resumo vai para a planilha e o painel
     saveClientes(); bg.remove(); toast('Horário salvo');
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
   };
@@ -1284,7 +1307,7 @@ function sheet(html, aoFechar){
 
 /* ---------- Formular proposta ---------- */
 function abrirProposta(id, depois){
-  const c = byId(id), p = c.proposta || { preco:'', frequencia:'', frequenciaOutro:'', franquia:'', excedente:'', vigencia: 12 };
+  const c = byId(id), p = c.proposta || { preco:'', frequencia:'', frequenciaOutro:'', franquia:'', excedente:'', vigencia: 36 };
   const revisao = !!c.proposta && c.status === 'realizada';
   const bg = sheet(`<h3>${c.proposta ? 'Editar proposta' : 'Formular proposta'}</h3><p class="sub">${esc(c.dados.nome)}${revisao ? ' · a proposta anterior fica guardada no histórico' : ''}</p>
     <form id="propForm" novalidate>
@@ -1297,7 +1320,7 @@ function abrirProposta(id, depois){
         <label class="f" data-k="franquia"><span>Franquia <i>*</i></span><div class="suffix"><input name="franquia" inputmode="numeric" placeholder="0" value="${esc(p.franquia)}"><em>kg/mês</em></div><div class="msg">Informe a franquia</div></label>
         <label class="f" data-k="excedente"><span>Excedente <i>*</i></span><div class="suffix"><input name="excedente" inputmode="numeric" placeholder="R$ 0,00" value="${esc(p.excedente)}"><em>/kg</em></div><div class="msg">Informe o excedente</div></label>
       </div>
-      <label class="f" data-k="vigencia"><span>Prazo de vigência do contrato <i>*</i></span><div class="suffix"><input name="vigencia" inputmode="numeric" placeholder="12" value="${esc(p.vigencia || 12)}"><em>meses</em></div><div class="msg">Informe a vigência (1 a 120 meses)</div></label>
+      <label class="f" data-k="vigencia"><span>Prazo de vigência do contrato <i>*</i></span><div class="suffix"><input name="vigencia" inputmode="numeric" placeholder="36" value="${esc(p.vigencia || 36)}"><em>meses</em></div><div class="msg">Informe a vigência (1 a 120 meses)</div></label>
       <button class="btn btn-green" type="submit" style="margin-top:6px">Salvar proposta</button>
       <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
     </form>`);
@@ -1339,6 +1362,19 @@ function pendencias(c){
   if (v.motivo === 'Outros' && !v.motivoOutro.trim()) p.push('Descrever o motivo da visita');
   return p;
 }
+// Trava do contrato fechado: tudo precisa estar preenchido
+function pendenciasContrato(c){
+  const v = c.visita, d = c.dados, p = pendencias(c);
+  if (!d.doc) p.push('Informar o CPF/CNPJ do cliente (Editar dados do cliente)');
+  ['nome', 'endereco', 'numero', 'bairro', 'cidade', 'telefone', 'email'].forEach(k => { if (!d[k]) p.push('Completar os dados do cliente (' + k + ')'); });
+  if (!v.contato || !v.contato.trim()) p.push('Informar o nome do contato');
+  if (!horarioCompleto(v.horario)) p.push('Informar os dias e o horário de atendimento');
+  if (!v.motivo) p.push('Escolher o motivo da visita');
+  return p;
+}
+const travaSheet = p => sheet(`<h3>🔒 Faltam informações</h3><p class="sub">Para registrar o <b>contrato fechado</b>, preencha:</p>
+    <div class="missing"><ul>${p.map(x => `<li>${x}</li>`).join('')}</ul></div>
+    <button class="btn btn-green" data-close>Entendi, vou completar</button>`);
 const faltaSheet = p => sheet(`<h3>Falta pouco</h3><p class="sub">Para finalizar com proposta ou contrato, complete:</p>
     <div class="missing"><ul>${p.map(x => `<li>${x}</li>`).join('')}</ul></div>
     <button class="btn btn-green" data-close>Entendi</button>`);
@@ -1356,7 +1392,8 @@ function abrirFinalizar(id){
   bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const r = b.dataset.r; bg.remove();
     if (r === 'proposta' || r === 'contrato') {
-      const p = pendencias(c); if (p.length) return faltaSheet(p);
+      const p = r === 'contrato' ? pendenciasContrato(c) : pendencias(c);
+      if (p.length) return r === 'contrato' ? travaSheet(p) : faltaSheet(p);
       const concluir = () => finalizar(id, r);
       return c.proposta ? concluir() : abrirProposta(id, concluir);
     }
@@ -1428,6 +1465,7 @@ function finalizar(id, resultado, extra = {}){
 }
 function converterContrato(id){
   const c = byId(id);
+  const p = pendenciasContrato(c); if (p.length) return travaSheet(p);
   if (!confirm(`Registrar contrato fechado hoje com ${c.dados.nome}?`)) return;
   c.resultado = 'contrato'; c.contratoEm = isoDate(new Date()); saveClientes();
   toast('Contrato fechado registrado! 🎉'); irInicio();
@@ -1442,8 +1480,15 @@ function viewClienteRealizado(c){
     : c.resultado === 'proposta' ? `<div class="result proposta">${I.send}<div>Proposta enviada em ${brDate(c.visitadoEm)}</div></div>`
     : `<div class="result outros">${c.resultado === 'outraEmpresa' ? I.building : c.resultado === 'fechado' ? I.cam : I.pin}<div>${RESULTADOS[c.resultado].txt} · ${brDate(c.visitadoEm)}
         ${c.resultado === 'outraEmpresa' ? `<br><small style="font-weight:500">Empresa atual: <b>${esc(c.concorrente)}</b></small>` : ''}</div></div>`;
+  const completar = c.resultado === 'proposta';
   $('#view').innerHTML = `${res}
-    ${dadosHTML(c, false)}
+    ${dadosHTML(c, completar)}
+    ${completar ? `<div class="sec"><h3>Atendimento</h3>
+      <label class="f"><span>Nome do contato</span><input value="${esc(v.contato)}" oninput="setVisita('contato',this.value)" placeholder="Com quem você falou"></label>
+      <div class="f"><span>Dias e horário de atendimento</span><button type="button" class="hbtn ${v.horario ? 'preenchido' : ''}" onclick="abrirHorario('${c.id}')">
+        ${v.horario ? resumoHorarioHTML(v.horario) : v.atendimento ? `<span class="hlin">${esc(v.atendimento)}</span><small>Toque para atualizar no novo formato</small>` : '<span class="hvazio">🕘 Toque para informar os dias e horários</span>'}</button></div>
+      <div class="f"><span>Motivo da visita</span><div class="chips">${MOTIVOS.map(o => `<button type="button" class="chip ${o === v.motivo ? 'on' : ''}" onclick="setMotivo('${o}')">${o}</button>`).join('')}</div></div>
+    </div>` : ''}
     ${v.modalidade || v.contato || v.atendimento || v.motivo || v.obs || v.checkin || v.fotos.length ? `<div class="sec"><h3>Visita</h3><dl class="kv">
       ${v.modalidade ? `<dt>Modalidade</dt><dd style="text-transform:capitalize">${esc(v.modalidade)}</dd>` : ''}
       ${v.contato ? `<dt>Contato</dt><dd>${esc(v.contato)}</dd>` : ''}
