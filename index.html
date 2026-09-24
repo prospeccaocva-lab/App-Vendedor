@@ -340,7 +340,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '14';
+const VERSAO = '15';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -620,8 +620,23 @@ function posLogin(u){
   usuarioPendente = u;
   if (u.senhaProvisoria) { mostrarForm('senhaForm'); setTimeout(() => $('#nPass').focus(), 50); return; }
   if (!u.email || !u.assinatura) { mostrarForm('perfilForm'); $('#pEmail').value = u.email || ''; return; }
-  if (GOOGLE.url && !u.token && navigator.onLine) return iniciarConfirmacao(u, true); // cadastro antigo: confirma o e-mail uma vez
+  if (GOOGLE.url && !u.token && navigator.onLine) { // sem chave de envio: pega uma nova com a senha, sem pedir o e-mail de novo
+    renovarToken(u).then(r => r === 'semSenha' ? iniciarConfirmacao(u, true) : entrar(usuarioPorCpf(u.cpf) || u)); return; // semSenha: cadastro antigo, confirma 1 única vez
+  }
   entrar(u);
+}
+const usuarioPorCpf = cpf => lsGet(K_USERS, []).find(x => x.cpf === cpf);
+// A chave de envio (token) é renovada pela senha. O código por e-mail fica só para o cadastro.
+let renovouEm = 0;
+async function renovarToken(u){
+  if (!GOOGLE.url || !u || !u.cpf || !/^[0-9a-f]{64}$/.test(u.hash || '') || u.senhaProvisoria || !navigator.onLine) return 'nao';
+  if (Date.now() - renovouEm < 120000) return 'nao'; renovouEm = Date.now(); // no máximo 1 tentativa a cada 2 minutos
+  try {
+    const r = await google('login', { cpf: u.cpf, hash: u.hash }, {});
+    const users = lsGet(K_USERS, []), x = users.find(y => y.cpf === u.cpf);
+    if (x) { x.token = r.token; x.situacao = r.situacao; lsSet(K_USERS, users); }
+    return 'ok';
+  } catch (e) { return e.codigo === 'semSenha' ? 'semSenha' : 'erro'; }
 }
 $('#senhaForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1664,8 +1679,13 @@ function atualizarSituacao(sit){
 }
 async function consultarSituacao(){
   if (!GOOGLE.url || !sessao || !navigator.onLine) return;
-  const u = usuarioAtual(); if (!u.token) return atualizarSituacao('confirmar');
-  try { const r = await google('situacao', {}); atualizarSituacao(r.situacao); } catch (e) {}
+  let u = usuarioAtual();
+  if (!u.token) { if (await renovarToken(u) !== 'ok') return atualizarSituacao('confirmar'); u = usuarioAtual(); }
+  try {
+    let r = await google('situacao', {});
+    if (r.situacao === 'confirmar' && await renovarToken(u) === 'ok') r = await google('situacao', {}); // chave recusada: renova pela senha
+    atualizarSituacao(r.situacao);
+  } catch (e) {}
 }
 function avisoSituacao(){
   if (!GOOGLE.url) return '';
@@ -1770,6 +1790,7 @@ async function sincronizar(){
     }
   } catch (e) {
     sincErro = e.message || 'erro';
+    if (e.codigo === 'confirmar' && await renovarToken(usuarioAtual()) === 'ok') { sincRodando = false; return sincronizar(); } // renova a chave pela senha e tenta de novo
     if (e.codigo === 'pendente') atualizarSituacao('Pendente'); else if (e.codigo === 'bloqueado') atualizarSituacao('Bloqueado'); else if (e.codigo === 'confirmar') atualizarSituacao('confirmar');
   }
   if (!sincErro) atualizarSituacao('Aprovado');
