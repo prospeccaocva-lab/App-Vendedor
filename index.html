@@ -340,7 +340,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '15';
+const VERSAO = '16';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -694,9 +694,9 @@ function start(){
   loadClientes();
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   route();
-  buscarMeta(); consultarSituacao();
-  // traz do Google o que foi feito em outro aparelho e depois envia o que mudou aqui
-  restaurarClientes(usuarioAtual()).catch(() => {}).then(sincronizar);
+  buscarMeta();
+  // 1º confere se a base foi zerada, depois traz do Google o que foi feito em outro aparelho e só então envia o que mudou aqui
+  consultarSituacao().catch(() => {}).then(() => sessao && restaurarClientes(usuarioAtual())).catch(() => {}).then(() => sessao && sincronizar());
 }
 
 /* =========================================================
@@ -1677,9 +1677,35 @@ function atualizarSituacao(sit){
   const users = lsGet(K_USERS, []), u = users.find(x => x.cpf === (sessao && sessao.cpf)); if (!u || !sit || u.situacao === sit) return;
   u.situacao = sit; lsSet(K_USERS, users); if (location.hash.replace('#', '') === '') viewHome();
 }
+// Base zerada pelo gestor: apaga do aparelho tudo o que foi criado antes da data do "zeramento"
+async function aplicarReset(reset){
+  if (!reset || !reset.em) return false;
+  let users = lsGet(K_USERS, []), saiu = false;
+  const apagarChaves = cpf => { try { Object.keys(localStorage).filter(k => k === 'cv_clientes_' + cpf || k === 'cv_sinc_' + cpf || k.indexOf('cv_meta_' + cpf + '_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
+  const apagarFotos = lista => lista.forEach(c => ((c.visita || {}).fotos || []).forEach(f => FotoDB.del(f.id).catch(() => {})));
+  if (reset.contas) { // cadastros dos vendedores também foram apagados
+    const velhos = users.filter(u => (u.criadoEm || '') < reset.contas);
+    velhos.forEach(u => { apagarFotos(lsGet('cv_clientes_' + u.cpf, [])); apagarChaves(u.cpf); if (sessao && sessao.cpf === u.cpf) saiu = true; });
+    if (velhos.length) { users = users.filter(u => !velhos.includes(u)); lsSet(K_USERS, users); }
+  }
+  users.forEach(u => {
+    const ativo = sessao && sessao.cpf === u.cpf && !saiu, lista = ativo ? clientes : lsGet('cv_clientes_' + u.cpf, []);
+    const velhos = lista.filter(c => (c.criadoEm || '') < reset.em); if (!velhos.length) return;
+    apagarFotos(velhos);
+    const st = lsGet('cv_sinc_' + u.cpf, null);
+    if (st) { velhos.forEach(c => { delete (st.cli || {})[c.id]; ((c.visita || {}).fotos || []).forEach(f => delete (st.fotos || {})[f.id]); }); lsSet('cv_sinc_' + u.cpf, st); }
+    const novos = lista.filter(c => !velhos.includes(c));
+    if (ativo) { clientes.length = 0; novos.forEach(c => clientes.push(c)); }
+    lsSet('cv_clientes_' + u.cpf, novos);
+    if (ativo) { location.hash = ''; route(); toast('A base de dados foi reiniciada pelo gestor.'); }
+  });
+  if (saiu) { sair(); $('#loginErr').textContent = 'A base de dados foi reiniciada pelo gestor. Faça o Primeiro acesso novamente.'; }
+  return saiu;
+}
 async function consultarSituacao(){
   if (!GOOGLE.url || !sessao || !navigator.onLine) return;
   let u = usuarioAtual();
+  try { const r0 = await google('situacao', {}); if (await aplicarReset(r0.reset)) return; } catch (e) {} // confere se a base foi zerada
   if (!u.token) { if (await renovarToken(u) !== 'ok') return atualizarSituacao('confirmar'); u = usuarioAtual(); }
   try {
     let r = await google('situacao', {});
@@ -1731,6 +1757,7 @@ async function restaurarClientes(u){
   if (ultimaRestauracao.cpf === u.cpf && Date.now() - ultimaRestauracao.em < 60000) return;
   const r = await google('baixarClientes', {}, u);
   ultimaRestauracao = { cpf: u.cpf, em: Date.now() };
+  if (await aplicarReset(r.reset)) return;
   const ativo = sessao && sessao.cpf === u.cpf, k = 'cv_clientes_' + u.cpf, ks = 'cv_sinc_' + u.cpf;
   const locais = ativo ? clientes : lsGet(k, []), st = lsGet(ks, { vend: null, cli: {}, fotos: {} });
   st.cli = st.cli || {}; st.fotos = st.fotos || {};
