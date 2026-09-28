@@ -344,7 +344,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '17';
+const VERSAO = '18';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -1530,7 +1530,7 @@ const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div
 
 function abrirFinalizar(id){
   const c = byId(id);
-  const bg = sheet(`<h3>Finalizar visita - Como Terminou a Visita?</h3><p class="sub">${esc(c.dados.nome)}</p>
+  const bg = sheet(`<h3>Finalizar Visita</h3><p class="sub">Como terminou a visita?</p>
     ${opt('proposta', I.send, 'blue', 'Proposta enviada', 'Vai para Visitas Realizadas')}
     ${opt('contrato', I.doc, 'ok', 'Contrato fechado', 'Vai para Visitas Realizadas e Contratos Fechados')}
     ${opt('recusou', I.x, 'rasp', 'Cliente recusou a proposta', 'Informe o motivo, se souber')}
