@@ -11,11 +11,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="jost.woff2" as="font" type="font/woff2" crossorigin>
 <title>Cheiro Verde – Vendas</title>
 <style>
+  @font-face{font-family:Jost;font-style:normal;font-weight:100 900;font-display:swap;src:url(jost.woff2) format('woff2')}
   :root{
     --green:#289548; --green-d:#1e7a3a; --green-dd:#145a2a; --lime:#afcb09; --lime-soft:#f2f7d9;
     --bg:#f3f6f1; --surface:#fff; --ink:#18261c; --muted:#66756a; --line:#e1e8de;
@@ -113,7 +112,13 @@
   .ccard .ln{font-size:14px;color:var(--muted);margin-top:6px;display:flex;gap:6px;align-items:flex-start}
   .ccard .ln svg{flex:none;margin-top:2px}
   .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
-  .t-orange{background:var(--orange-bg);color:#b86a00} .t-red{background:var(--red-bg);color:var(--red)}
+  .t-orange{background:var(--orange-bg);color:#b86a00} .t-red{background:var(--red-bg);color:var(--red)} .t-rasp{background:#fbe8f0;color:#a8335f}
+  .ccard.recusou{border-left-color:#c2417a} .result.recusou{background:#fbe8f0;color:#a8335f}
+  .f input.maiusc{text-transform:uppercase}
+  .mesnav{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:14px;padding:6px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .mesnav b{font-size:16px}
+  .mesnav button{width:44px;height:40px;border-radius:10px;font-size:22px;color:var(--green-d);font-weight:700}
+  .mesnav button:disabled{opacity:.25}
   .ccard.outra{border-left-color:var(--orange)} .ccard.fech{border-left-color:#9aa696} .ccard.nexiste{border-left-color:var(--red)}
   .result.outros{background:#eef1ec;color:var(--ink)}
   .dot.o{background:#9aa696}
@@ -335,12 +340,11 @@
 <input type="file" id="fileGaleria" accept="image/*" class="hidden">
 <div class="toast" id="toast"></div>
 
-<script src="jspdf.umd.min.js"></script>
 <script>
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '16';
+const VERSAO = '17';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -804,6 +808,7 @@ function viewHome(){
 const RESULTADOS = {
   proposta:     { txt: 'Proposta enviada', tag: 't-blue', cls: 'prop' },
   contrato:     { txt: 'Contrato fechado', tag: 't-ok', cls: 'done' },
+  recusou:      { txt: 'Cliente recusou a proposta', tag: 't-rasp', cls: 'recusou' },
   outraEmpresa: { txt: 'Atendido por outra empresa', tag: 't-orange', cls: 'outra' },
   fechado:      { txt: 'Cliente fechado', tag: 't-grey', cls: 'fech' },
   naoExiste:    { txt: 'Cliente não existe', tag: 't-red', cls: 'nexiste' },
@@ -816,7 +821,7 @@ function clienteCard(c){
   if (R) { tag = `<span class="tag ${R.tag}">${R.txt}</span>`; cls = R.cls; }
   return `<button class="ccard ${cls}" onclick="location.hash='cliente/${c.id}'">
     <div class="row"><span class="nm">${esc(d.nome)}</span>${tag}</div>
-    <div class="ln">${I.pinS}<span>${esc(d.endereco)}, ${esc(d.numero)} – ${esc(d.bairro)}, ${esc(d.cidade)}</span></div>
+    <div class="ln">${I.pinS}<span>${esc(d.endereco)}, ${esc(d.numero)} – ${esc(d.bairro)}, ${esc(cidadeUF(d))}</span></div>
     <div class="ln">${I.phoneS}<span>${esc(d.telefone)}</span></div>
   </button>`;
 }
@@ -830,34 +835,38 @@ function viewVisitar(){
     : empty('Nenhum cliente para visitar.<br>Toque em <b>Novo cliente</b> para cadastrar.');
 }
 
-/* ---------- Contratos fechados ---------- */
-let filtroContratos = 'mes';
+/* ---------- Contratos fechados (por mês do fechamento) ---------- */
+let mesContratos = null; // 'AAAA-MM' (padrão: mês atual)
+function mudarMesContratos(d){ const [y, m] = (mesContratos || mesAtual()).split('-').map(Number); const n = new Date(y, m - 1 + d, 1);
+  mesContratos = `${n.getFullYear()}-${pad(n.getMonth() + 1)}`; viewContratos(); }
 function viewContratos(){
   topbar('Contratos Fechados', '');
-  const nomeMes = MESES[new Date().getMonth()];
-  let list = filtroContratos === 'mes' ? contratosMes() : contratos();
-  list = list.sort((a, b) => (b.contratoEm || '').localeCompare(a.contratoEm || ''));
+  const mes = mesContratos || mesAtual(), [y, m] = mes.split('-').map(Number), nomeMes = `${MESES[m - 1][0].toUpperCase() + MESES[m - 1].slice(1)} de ${y}`;
+  const todos = contratos(), primeiro = todos.reduce((a, c) => (c.contratoEm || '9') < a ? c.contratoEm.slice(0, 7) : a, mesAtual());
+  const list = todos.filter(c => (c.contratoEm || '').startsWith(mes)).sort((a, b) => (b.contratoEm || '').localeCompare(a.contratoEm || ''));
   $('#view').innerHTML = `
-    <div class="seg">
-      <button class="${filtroContratos==='mes'?'on':''}" onclick="filtroContratos='mes';viewContratos()">${nomeMes}</button>
-      <button class="${filtroContratos==='todos'?'on':''}" onclick="filtroContratos='todos';viewContratos()">Todos</button>
-    </div>
+    <div class="mesnav"><button aria-label="Mês anterior" onclick="mudarMesContratos(-1)" ${mes <= primeiro ? 'disabled' : ''}>‹</button>
+      <b>${nomeMes}</b><button aria-label="Próximo mês" onclick="mudarMesContratos(1)" ${mes >= mesAtual() ? 'disabled' : ''}>›</button></div>
     ${list.length ? `<div class="list">${list.map(c => `
       <button class="ccard done" onclick="location.hash='cliente/${c.id}'">
         <div class="row"><span class="nm">${esc(c.dados.nome)}</span><span class="tag t-ok">${brDate(c.contratoEm)}</span></div>
-        <div class="ln">${I.pinS}<span>${esc(c.dados.cidade)}</span></div>
+        <div class="ln">${I.pinS}<span>${esc(cidadeUF(c.dados))}</span></div>
         ${c.proposta ? `<div class="ln"><b style="color:var(--ink)">${esc(c.proposta.preco)}</b>&nbsp;· ${esc(freqTxt(c.proposta))}</div>` : ''}
-      </button>`).join('')}</div>` : empty(filtroContratos === 'mes' ? `Nenhum contrato fechado em ${nomeMes} ainda.` : 'Nenhum contrato fechado ainda.')}`;
+      </button>`).join('')}</div>` : empty(`Nenhum contrato fechado em ${nomeMes}.`)}`;
 }
 
 /* =========================================================
    NOVO CLIENTE / EDITAR
    ========================================================= */
+// Estado (UF): opções rápidas + "Outro"
+const UFS = ['PR', 'SP', 'MG', 'RJ'];
+const UFS_BR = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+const cidadeUF = d => d.cidade + (d.estado ? '/' + d.estado : '');
 const CAMPOS = [
-  { k:'nome', l:'Nome / Razão social', req:true },
+  { k:'nome', l:'Nome / Razão social', req:true, maiusc:true },
   { k:'doc', l:'CPF / CNPJ', mask:maskDoc, mode:'numeric', ph:'Opcional' },
   { k:'endereco', l:'Endereço (rua / avenida)', req:true },
-  { k:'numero', l:'Número', req:true, half:true },
+  { k:'numero', l:'Número', req:true, half:true, mode:'numeric', ph:'Ex.: 125' },
   { k:'bairro', l:'Bairro', req:true },
   { k:'cidade', l:'Cidade', req:true },
   { k:'telefone', l:'Telefone', req:true, mask:maskFone, mode:'tel', ph:'(00) 00000-0000' },
@@ -869,13 +878,17 @@ function viewForm(id){
   if (id && !c) return location.hash = '';
   topbar(c ? 'Editar cliente' : 'Novo cliente', c ? 'cliente/' + id : 'visitar');
   const campo = f => `<label class="f" data-k="${f.k}"><span>${f.l}${f.req ? ' <i>*</i>' : ''}</span>
-      <input name="${f.k}" ${f.type ? `type="${f.type}"` : ''} ${f.mode ? `inputmode="${f.mode}"` : ''} placeholder="${f.ph || ''}" value="${esc(c ? c.dados[f.k] : '')}">
+      <input name="${f.k}" ${f.type ? `type="${f.type}"` : ''} ${f.mode ? `inputmode="${f.mode}"` : ''} ${f.maiusc ? 'class="maiusc" autocapitalize="characters"' : ''} placeholder="${f.ph || ''}" value="${esc(c ? c.dados[f.k] : '')}">
       <div class="msg"></div></label>`;
   $('#view').innerHTML = `<form id="cliForm" novalidate>
     <div class="sec"><h3>Dados do cliente</h3>
       ${campo(CAMPOS[0])}${campo(CAMPOS[1])}${campo(CAMPOS[2])}
       <div class="grid-num">${campo(CAMPOS[4])}${campo(CAMPOS[3])}</div>
       ${campo(CAMPOS[5])}
+      <div class="f" data-k="estado"><span>Estado <i>*</i></span>
+        <div class="chips" data-ufs>${UFS.map(u => `<button type="button" class="chip" data-uf="${u}">${u}</button>`).join('')}<button type="button" class="chip" data-uf="outro">Outro</button></div>
+        <input name="estadoOutro" class="maiusc hidden" autocapitalize="characters" maxlength="2" placeholder="Sigla do estado (ex.: SC)" style="margin-top:8px">
+        <div class="msg"></div></div>
     </div>
     <div class="sec"><h3>Contato</h3>${campo(CAMPOS[6])}${campo(CAMPOS[7])}</div>
     <p class="hint" style="margin:0 4px">Campos com <b style="color:var(--red)">*</b> são obrigatórios.</p>
@@ -883,12 +896,22 @@ function viewForm(id){
   </form>`;
   const form = $('#cliForm');
   CAMPOS.filter(f => f.mask).forEach(f => form[f.k].addEventListener('input', e => e.target.value = f.mask(e.target.value)));
+  form.numero.addEventListener('input', e => e.target.value = e.target.value.toUpperCase()); // aceita "S/N" ou "12A" se precisar
+  // Estado
+  let uf = c && c.dados.estado ? c.dados.estado : '';
+  const marcarUF = () => { const outro = !!uf && !UFS.includes(uf) || uf === 'outro';
+    form.querySelectorAll('[data-uf]').forEach(b => b.classList.toggle('on', b.dataset.uf === (outro ? 'outro' : uf)));
+    form.estadoOutro.classList.toggle('hidden', !outro); if (outro && uf !== 'outro') form.estadoOutro.value = uf; };
+  form.querySelectorAll('[data-uf]').forEach(b => b.onclick = () => { uf = b.dataset.uf; form.querySelector('[data-k="estado"]').classList.remove('bad');
+    marcarUF(); if (uf === 'outro') setTimeout(() => form.estadoOutro.focus(), 30); });
+  form.estadoOutro.addEventListener('input', e => e.target.value = e.target.value.replace(/[^a-z]/gi, '').toUpperCase());
+  marcarUF();
   form.addEventListener('input', e => e.target.closest('.f')?.classList.remove('bad'));
   form.addEventListener('submit', e => {
     e.preventDefault();
     const dados = {}; let first = null;
     CAMPOS.forEach(f => {
-      const v = form[f.k].value.trim(); dados[f.k] = v;
+      let v = form[f.k].value.trim().replace(/\s+/g, ' '); if (f.maiusc) v = v.toLocaleUpperCase('pt-BR'); dados[f.k] = v;
       let m = '';
       if (f.req && !v) m = 'Campo obrigatório';
       else if (f.k === 'doc' && v && !(digits(v).length === 11 ? validCPF(v) : validCNPJ(v))) m = 'CPF ou CNPJ inválido';
@@ -898,6 +921,12 @@ function viewForm(id){
       el.classList.toggle('bad', !!m); el.querySelector('.msg').textContent = m;
       if (m && !first) first = el;
     });
+    { // Estado
+      dados.estado = uf === 'outro' ? form.estadoOutro.value.trim().toUpperCase() : uf;
+      const m = !dados.estado ? 'Escolha o estado' : !UFS_BR.includes(dados.estado) ? 'Sigla de estado inválida' : '';
+      const el = form.querySelector('[data-k="estado"]'); el.classList.toggle('bad', !!m); el.querySelector('.msg').textContent = m;
+      if (m && !first) first = el;
+    }
     if (first) { first.scrollIntoView({ behavior:'smooth', block:'center' }); toast('Confira os campos destacados'); return; }
     if (c) { c.dados = dados; saveClientes(); toast('Cliente atualizado'); location.hash = ''; return; }
     clientes.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), criadoEm: new Date().toISOString(), status: 'pendente',
@@ -921,7 +950,7 @@ function dadosHTML(c, editavel){
     <dl class="kv">
       <dt>Nome</dt><dd><b>${esc(d.nome)}</b></dd>
       ${d.doc ? `<dt>CPF/CNPJ</dt><dd>${esc(d.doc)}</dd>` : ''}
-      <dt>Endereço</dt><dd>${esc(d.endereco)}, ${esc(d.numero)}<br>${esc(d.bairro)} – ${esc(d.cidade)}</dd>
+      <dt>Endereço</dt><dd>${esc(d.endereco)}, ${esc(d.numero)}<br>${esc(d.bairro)} – ${esc(cidadeUF(d))}</dd>
       <dt>Telefone</dt><dd><a href="tel:${digits(d.telefone)}">${esc(d.telefone)}</a></dd>
       <dt>E-mail</dt><dd><a href="mailto:${esc(d.email)}">${esc(d.email)}</a></dd>
     </dl></div>`;
@@ -975,7 +1004,7 @@ function viewCliente(id){
     ${m ? `
     <div class="sec"><h3>Atendimento</h3>
       <label class="f"><span>Nome do contato</span><input value="${esc(v.contato)}" oninput="setVisita('contato',this.value)" placeholder="Com quem você falou"></label>
-      <div class="f"><span>Dias e horário de atendimento</span>
+      <div class="f"><span>Dias e horário de atendimento <small style="font-weight:500;color:var(--muted)">(opcional)</small></span>
         <button type="button" class="hbtn ${v.horario || v.atendimento ? 'preenchido' : ''}" onclick="abrirHorario('${c.id}')">
           ${v.horario ? resumoHorarioHTML(v.horario) : v.atendimento ? `<span class="hlin">${esc(v.atendimento)}</span><small>Toque para atualizar no novo formato</small>` : '<span class="hvazio">🕘 Toque para informar os dias e horários</span>'}
         </button></div>
@@ -1070,12 +1099,12 @@ const resumoHorarioHTML = h => { const g = gruposHorario(h);
 function abrirHorario(id){
   const c = byId(id), h = normalizarHorario(c.visita.horario);
   const campos = (pref, t) => `<div class="hgrid">
-      <label><small>Abertura</small><input type="time" data-c="${pref}abre" value="${t.abre}"></label>
-      <label><small>Fechamento</small><input type="time" data-c="${pref}fecha" value="${t.fecha}"></label>
-      <label><small>Início almoço</small><input type="time" data-c="${pref}almIni" value="${t.almIni}"></label>
-      <label><small>Retorno almoço</small><input type="time" data-c="${pref}almFim" value="${t.almFim}"></label>
+      <label><small>Abertura</small><input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-c="${pref}abre" value="${t.abre}"></label>
+      <label><small>Fechamento</small><input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-c="${pref}fecha" value="${t.fecha}"></label>
+      <label><small>Início almoço</small><input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-c="${pref}almIni" value="${t.almIni}"></label>
+      <label><small>Retorno almoço</small><input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" autocomplete="off" data-c="${pref}almFim" value="${t.almFim}"></label>
     </div>`;
-  const bg = sheet(`<h3>Dias e horário de atendimento</h3><p class="sub">1. Marque os dias em que o cliente <b>estará aberto</b>. 2. Informe o horário uma vez só.</p>
+  const bg = sheet(`<h3>Dias e horário de atendimento</h3><p class="sub">Opcional. 1. Marque os dias em que o cliente <b>estará aberto</b>. 2. Digite o horário (HH:MM) uma vez só.</p>
     <div class="hdias" data-dias></div>
     <div class="hbox"><div class="hbox-t">Horário de funcionamento</div><div data-padrao></div><small class="hdica">Sem pausa para almoço? Deixe os campos de almoço vazios.</small></div>
     <div data-custom></div>
@@ -1104,22 +1133,31 @@ function abrirHorario(id){
     sub.querySelectorAll('[data-esc]').forEach(b => b.onclick = () => { h.custom[b.dataset.esc] = { ...h.padrao }; sub.remove(); desenhar();
       setTimeout(() => bg.querySelector(`[data-c="${b.dataset.esc}.abre"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); });
   };
+  const horaOk = x => !x || /^([01]\d|2[0-3]):[0-5]\d$/.test(x);
   const validar = () => {
     const erros = [], checa = (nome, t) => {
+      const ruins = ['abre', 'almIni', 'almFim', 'fecha'].filter(k => !horaOk(t[k]));
+      if (ruins.length) return erros.push(`${nome}: use o formato HH:MM (ex.: 08:00, 18:30)`);
       if (!t.abre || !t.fecha) return erros.push(`${nome}: informe abertura e fechamento`);
       if (!!t.almIni !== !!t.almFim) return erros.push(`${nome}: preencha início e retorno do almoço (ou deixe os dois vazios)`);
       const seq = t.almIni ? [t.abre, t.almIni, t.almFim, t.fecha] : [t.abre, t.fecha];
       if (seq.some((x, i) => i && x <= seq[i - 1])) erros.push(`${nome}: horários fora de ordem (abertura → almoço → retorno → fechamento)`); };
-    if (!DIAS.some(([k]) => h.dias[k])) erros.push('Marque pelo menos um dia de atendimento');
+    if (!DIAS.some(([k]) => h.dias[k])) { if (h.padrao.abre || h.padrao.fecha) erros.push('Marque os dias de atendimento (ou apague os horários)'); }
     else { checa('Horário de funcionamento', h.padrao); DIAS.forEach(([k, nome]) => { if (h.custom[k]) checa(nome, h.custom[k]); }); }
     return erros;
   };
+  bg.addEventListener('input', e => { const i = e.target; if (!i.dataset || !i.dataset.c) return;
+    const d = digits(i.value).slice(0, 4); i.value = d.length > 2 ? d.slice(0, 2) + ':' + d.slice(2) : d;
+    if (d.length === 4) { const prox = [...bg.querySelectorAll('[data-c]')], k = prox.indexOf(i); if (prox[k + 1]) prox[k + 1].focus(); } }); // pula para o próximo campo
+  bg.addEventListener('focusout', e => { const i = e.target; if (!i.dataset || !i.dataset.c) return; const d = digits(i.value); // "8" → 08:00 · "830" → 08:30
+    if (d.length && d.length <= 2) i.value = d.padStart(2, '0') + ':00'; else if (d.length === 3) i.value = '0' + d[0] + ':' + d.slice(1); });
   desenhar();
   bg.querySelector('[data-ok]').onclick = () => {
     ler(); const erros = validar(), box = bg.querySelector('[data-erro]');
     if (erros.length) { box.innerHTML = `<ul>${erros.map(e => `<li>${e}</li>`).join('')}</ul>`; box.classList.remove('hidden'); return; }
     Object.keys(h.custom).forEach(k => { if (!h.dias[k] || JSON.stringify(h.custom[k]) === JSON.stringify(h.padrao)) delete h.custom[k]; });
-    c.visita.horario = h; c.visita.atendimento = resumoHorario(h); // resumo vai para a planilha e o painel
+    const vazio = !DIAS.some(([k]) => h.dias[k]);
+    c.visita.horario = vazio ? null : h; c.visita.atendimento = vazio ? '' : resumoHorario(h); // resumo vai para a planilha e o painel
     saveClientes(); bg.remove(); toast('Horário salvo');
     const y = window.scrollY; viewCliente(id); window.scrollTo(0, y);
   };
@@ -1181,6 +1219,13 @@ async function receberFoto(e, camera){
   const y = window.scrollY; viewCliente(c.id); window.scrollTo(0, y);
 }
 
+// Gerador de PDF (arquivo grande): só é carregado quando o vendedor abre uma proposta — o app abre mais rápido
+let jspdfP = null;
+function carregarJsPDF(){
+  if (window.jspdf) return Promise.resolve();
+  return jspdfP || (jspdfP = new Promise((ok, erro) => { const sc = document.createElement('script'); sc.src = 'jspdf.umd.min.js';
+    sc.onload = ok; sc.onerror = () => { jspdfP = null; erro(new Error('Arquivo não encontrado no site: jspdf.umd.min.js')); }; document.head.appendChild(sc); }));
+}
 async function carregarImagem(file){
   if (window.createImageBitmap) { try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {} }
   return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = URL.createObjectURL(file); });
@@ -1260,6 +1305,7 @@ async function imgData(url){
 }
 
 async function gerarPropostaPDF(c){
+  await carregarJsPDF();
   const { jsPDF } = window.jspdf;
   const [cab, rod, marca] = await Promise.all(['cabecalho.jpg', 'rodape.jpg', 'marca-dagua.jpg'].map(imgData));
   const p = c.proposta, d = c.dados, vend = usuarioAtual();
@@ -1469,9 +1515,8 @@ function pendencias(c){
 function pendenciasContrato(c){
   const v = c.visita, d = c.dados, p = pendencias(c);
   if (!d.doc) p.push('Informar o CPF/CNPJ do cliente (Editar dados do cliente)');
-  ['nome', 'endereco', 'numero', 'bairro', 'cidade', 'telefone', 'email'].forEach(k => { if (!d[k]) p.push('Completar os dados do cliente (' + k + ')'); });
+  ['nome', 'endereco', 'numero', 'bairro', 'cidade', 'estado', 'telefone', 'email'].forEach(k => { if (!d[k]) p.push('Completar os dados do cliente (' + k + ')'); });
   if (!v.contato || !v.contato.trim()) p.push('Informar o nome do contato');
-  if (!horarioCompleto(v.horario)) p.push('Informar os dias e o horário de atendimento');
   if (!v.motivo) p.push('Escolher o motivo da visita');
   return p;
 }
@@ -1481,13 +1526,14 @@ const travaSheet = p => sheet(`<h3>🔒 Faltam informações</h3><p class="sub">
 const faltaSheet = p => sheet(`<h3>Falta pouco</h3><p class="sub">Para finalizar com proposta ou contrato, complete:</p>
     <div class="missing"><ul>${p.map(x => `<li>${x}</li>`).join('')}</ul></div>
     <button class="btn btn-green" data-close>Entendi</button>`);
-const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div class="ic" style="background:var(--${cor}-bg);color:var(--${cor === 'ok' ? 'ok' : cor})">${ic}</div><div><b>${titulo}</b><small>${sub}</small></div></button>`;
+const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div class="ic" style="background:${cor === 'rasp' ? '#fbe8f0' : `var(--${cor}-bg)`};color:${cor === 'rasp' ? '#a8335f' : `var(--${cor})`}">${ic}</div><div><b>${titulo}</b><small>${sub}</small></div></button>`;
 
 function abrirFinalizar(id){
   const c = byId(id);
-  const bg = sheet(`<h3>Finalizar visita</h3><p class="sub">${esc(c.dados.nome)} · Como terminou a visita?</p>
+  const bg = sheet(`<h3>Finalizar visita - Como Terminou a Visita?</h3><p class="sub">${esc(c.dados.nome)}</p>
     ${opt('proposta', I.send, 'blue', 'Proposta enviada', 'Vai para Visitas Realizadas')}
     ${opt('contrato', I.doc, 'ok', 'Contrato fechado', 'Vai para Visitas Realizadas e Contratos Fechados')}
+    ${opt('recusou', I.x, 'rasp', 'Cliente recusou a proposta', 'Informe o motivo, se souber')}
     ${opt('outraEmpresa', I.building, 'orange', 'Cliente já atendido por outra empresa', 'Informe qual empresa atende hoje')}
     ${opt('fechado', I.cam, 'grey', 'Cliente fechado', 'Obrigatório: foto da fachada')}
     ${opt('naoExiste', I.pin, 'red', 'Cliente não existe', 'Obrigatório: registrar a localização')}
@@ -1500,12 +1546,27 @@ function abrirFinalizar(id){
       const concluir = () => finalizar(id, r);
       return c.proposta ? concluir() : abrirProposta(id, concluir);
     }
+    if (r === 'recusou') { const p = pendencias(c); return p.length ? faltaSheet(p) : finalizarRecusou(id); }
     if (r === 'outraEmpresa') return finalizarOutraEmpresa(id);
     if (r === 'fechado') return finalizarFechado(id);
     if (r === 'naoExiste') return finalizarNaoExiste(id);
   });
 }
 
+// Cliente recusou a proposta (na visita ou depois, numa proposta já enviada)
+function finalizarRecusou(id, depois){
+  const c = byId(id);
+  const bg = sheet(`<h3>Cliente recusou a proposta</h3><p class="sub">${esc(c.dados.nome)}</p>
+    <form id="fRecusa" novalidate>
+      <label class="f"><span>Motivo da recusa (opcional)</span><textarea name="motivo" rows="3" placeholder="Ex.: preço acima do orçamento, já fechou com outra empresa…"></textarea></label>
+      <button class="btn btn-green" type="submit">${depois ? 'Registrar recusa' : 'Finalizar visita'}</button>
+      <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+    </form>`);
+  bg.querySelector('#fRecusa').onsubmit = e => { e.preventDefault(); const motivo = e.target.motivo.value.trim(); bg.remove();
+    c.motivoRecusa = motivo; c.recusadoEm = isoDate(new Date());
+    if (!depois) return finalizar(id, 'recusou');
+    c.resultado = 'recusou'; saveClientes(); toast('Recusa registrada'); irInicio(); };
+}
 function finalizarOutraEmpresa(id){
   const c = byId(id);
   const bg = sheet(`<h3>Atendido por outra empresa</h3><p class="sub">${esc(c.dados.nome)}</p>
@@ -1581,6 +1642,8 @@ function viewClienteRealizado(c){
   const res = c.resultado === 'contrato'
     ? `<div class="result contrato">${I.doc}<div>Contrato fechado em ${brDate(c.contratoEm)}<br><small style="font-weight:500">Visita em ${brDate(c.visitadoEm)}</small></div></div>`
     : c.resultado === 'proposta' ? `<div class="result proposta">${I.send}<div>Proposta enviada em ${brDate(c.visitadoEm)}</div></div>`
+    : c.resultado === 'recusou' ? `<div class="result recusou">${I.x}<div>Cliente recusou a proposta · ${brDate(c.recusadoEm || c.visitadoEm)}
+        ${c.motivoRecusa ? `<br><small style="font-weight:500">Motivo: ${esc(c.motivoRecusa)}</small>` : ''}</div></div>`
     : `<div class="result outros">${c.resultado === 'outraEmpresa' ? I.building : c.resultado === 'fechado' ? I.cam : I.pin}<div>${RESULTADOS[c.resultado].txt} · ${brDate(c.visitadoEm)}
         ${c.resultado === 'outraEmpresa' ? `<br><small style="font-weight:500">Empresa atual: <b>${esc(c.concorrente)}</b></small>` : ''}</div></div>`;
   const completar = c.resultado === 'proposta';
@@ -1603,7 +1666,8 @@ function viewClienteRealizado(c){
     ${v.fotos.length ? `<div class="photos" style="margin-top:14px">${v.fotos.map(f => `<div class="ph"><img data-foto="${f.id}" alt="" onclick="verFoto('${f.id}')"></div>`).join('')}</div>` : ''}
     </div>` : ''}
     ${c.proposta ? propostaHTML(c, c.resultado === 'proposta') : ''}
-    ${c.resultado === 'proposta' ? `<div class="bottom-bar"><button class="btn btn-green" onclick="converterContrato('${c.id}')">Cliente aceitou: registrar contrato fechado</button></div>` : ''}`;
+    ${c.resultado === 'proposta' ? `<button class="btn btn-ghost" style="color:#a8335f" onclick="finalizarRecusou('${c.id}', true)">Cliente recusou a proposta</button>
+      <div class="bottom-bar"><button class="btn btn-green" onclick="converterContrato('${c.id}')">Cliente aceitou: registrar contrato fechado</button></div>` : ''}`;
   carregarFotos();
 }
 
