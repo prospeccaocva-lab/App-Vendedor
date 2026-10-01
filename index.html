@@ -344,7 +344,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '18';
+const VERSAO = '19';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -1424,7 +1424,7 @@ async function mostrarPDF(id, aoFechar){
   const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Gerando a proposta em PDF…'; document.body.appendChild(b);
   let arq;
   try {
-    if (!window.jspdf) throw new Error('Arquivo não encontrado no site: jspdf.umd.min.js');
+    await carregarJsPDF(); // carrega o gerador de PDF na primeira vez que for usado
     arq = await gerarPropostaPDF(c);
   } catch (e) {
     b.remove();
