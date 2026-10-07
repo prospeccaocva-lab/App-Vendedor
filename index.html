@@ -113,7 +113,13 @@
   .ccard .ln svg{flex:none;margin-top:2px}
   .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
   .t-orange{background:var(--orange-bg);color:#b86a00} .t-red{background:var(--red-bg);color:var(--red)} .t-rasp{background:#fbe8f0;color:#a8335f}
-  .ccard.recusou{border-left-color:#c2417a} .result.recusou{background:#fbe8f0;color:#a8335f}
+  .ccard.recusou{border-left-color:#c2417a} .t-teal{background:#e0f3f5;color:#086f7b} .ccard.cobranca{border-left-color:#0a8f9e}
+  .provas{display:grid;gap:10px;margin:4px 0 14px}
+  .prova{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--grey-bg);font-size:14px;font-weight:600}
+  .prova.ok{background:var(--ok-bg);color:var(--green-d)}
+  .prova i{font-style:normal;font-size:18px}
+  .fotosFin{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .fotosFin .ph{width:96px} .result.recusou{background:#fbe8f0;color:#a8335f}
   .f input.maiusc{text-transform:uppercase}
   .mesnav{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:14px;padding:6px;margin-bottom:14px;box-shadow:var(--shadow)}
   .mesnav b{font-size:16px}
@@ -344,7 +350,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '19';
+const VERSAO = '20';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -812,6 +818,7 @@ const RESULTADOS = {
   outraEmpresa: { txt: 'Atendido por outra empresa', tag: 't-orange', cls: 'outra' },
   fechado:      { txt: 'Cliente fechado', tag: 't-grey', cls: 'fech' },
   naoExiste:    { txt: 'Cliente não existe', tag: 't-red', cls: 'nexiste' },
+  cobranca:     { txt: 'Cobrança', tag: 't-teal', cls: 'cobranca' },
 };
 function clienteCard(c){
   const d = c.dados;
@@ -1036,7 +1043,7 @@ function viewCliente(id){
 }
 
 function fotosHTML(c){
-  const v = { ...c.visita, fotos: c.visita.fotos.filter(f => f.tipo !== 'fachada') }, pres = v.modalidade === 'presencial';
+  const v = { ...c.visita, fotos: c.visita.fotos.filter(fotoDaVisita) }, pres = v.modalidade === 'presencial';
   const titulo = pres ? 'Fotos do local' : 'Fotos / anexos (opcional)';
   const selo = v.fotos.length ? `<span class="okk">${v.fotos.length} de 3</span>` : (pres ? '<span class="req">Mín. 1 foto</span>' : '');
   return `<div class="sec"><h3>${titulo} ${selo}</h3>
@@ -1189,10 +1196,14 @@ function fazerCheckin(id){
 }
 
 /* ---------- Fotos com data, hora e local gravados ---------- */
-let fotoCtx = null; // { cid, tipo: 'local' | 'fachada', aoConcluir }
+let fotoCtx = null; // { cid, tipo: 'local' | 'fachada' | 'naoExiste' | 'outraEmpresa' | 'cobranca', aoConcluir }
+// Fotos de finalização: as de câmera são obrigatoriamente tiradas na hora; a de cobrança aceita galeria ou print do computador
+const FOTO_FINAL = { fachada: 'fachada (cliente fechado)', naoExiste: 'cliente não existe', outraEmpresa: 'atendido por outra empresa', cobranca: 'cobrança' };
+const fotoDaVisita = f => !f.tipo || f.tipo === 'local';
+const fotoSoCamera = tipo => tipo === 'fachada' || tipo === 'naoExiste' || tipo === 'outraEmpresa';
 function tirarFoto(id, tipo = 'local', aoConcluir = null){
   fotoCtx = { cid: id, tipo, aoConcluir };
-  const camera = tipo === 'fachada' || byId(id).visita.modalidade === 'presencial';
+  const camera = fotoSoCamera(tipo) || (tipo === 'local' && byId(id).visita.modalidade === 'presencial');
   const inp = camera ? $('#fileCamera') : $('#fileGaleria');
   inp.value = ''; inp.click();
 }
@@ -1200,10 +1211,10 @@ function tirarFoto(id, tipo = 'local', aoConcluir = null){
 async function receberFoto(e, camera){
   const file = e.target.files[0]; if (!file || !fotoCtx) return;
   const ctx = fotoCtx, c = byId(ctx.cid);
-  if (ctx.tipo === 'local' && c.visita.fotos.filter(f => f.tipo !== 'fachada').length >= 3) return;
+  if (ctx.tipo === 'local' && c.visita.fotos.filter(fotoDaVisita).length >= 3) return;
   // Segunda trava da visita presencial: foto recém-tirada tem data de agora; foto antiga da galeria é recusada
   if (camera && file.lastModified && Date.now() - file.lastModified > 3 * 60 * 1000) {
-    toast('Na visita presencial, use apenas foto tirada agora pela câmera'); return;
+    toast('Use apenas foto tirada agora pela câmera'); return;
   }
   const b = document.createElement('div'); b.className = 'busy'; b.textContent = 'Processando foto…'; document.body.appendChild(b);
   try {
@@ -1237,9 +1248,9 @@ async function carimbarFoto(file, quando, c, tipo = 'local'){
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const g = cv.getContext('2d'); g.drawImage(img, 0, 0, w, h);
   const fs = Math.max(18, Math.round(w * 0.032)), padd = Math.round(fs * 0.7);
-  const pres = tipo === 'fachada' || c.visita.modalidade === 'presencial';
+  const pres = fotoSoCamera(tipo) || (tipo === 'local' && c.visita.modalidade === 'presencial');
   const linhas = [pres ? brDateTime(quando) : 'Anexado em ' + brDateTime(quando).slice(0, 16),
-    tipo === 'fachada' ? c.dados.nome + ' · fachada (cliente fechado)' : pres ? c.dados.nome : c.dados.nome + ' · visita virtual'];
+    FOTO_FINAL[tipo] ? c.dados.nome + ' · ' + FOTO_FINAL[tipo] : pres ? c.dados.nome : c.dados.nome + ' · visita virtual'];
   const k = c.visita.checkin; if (pres && k) linhas.push(`${k.lat.toFixed(5)}, ${k.lng.toFixed(5)}`);
   const bh = padd * 2 + fs * 1.3 * linhas.length;
   g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, h - bh, w, bh);
@@ -1506,7 +1517,7 @@ function pendencias(c){
   if (!v.modalidade) p.push('Escolher a modalidade da visita');
   if (v.modalidade === 'presencial') {
     if (!v.checkin) p.push('Fazer o check-in no local');
-    if (!v.fotos.filter(f => f.tipo !== 'fachada').length) p.push('Incluir pelo menos 1 foto do local');
+    if (!v.fotos.filter(fotoDaVisita).length) p.push('Incluir pelo menos 1 foto do local');
   }
   if (v.motivo === 'Outros' && !v.motivoOutro.trim()) p.push('Descrever o motivo da visita');
   return p;
@@ -1526,7 +1537,8 @@ const travaSheet = p => sheet(`<h3>🔒 Faltam informações</h3><p class="sub">
 const faltaSheet = p => sheet(`<h3>Falta pouco</h3><p class="sub">Para finalizar com proposta ou contrato, complete:</p>
     <div class="missing"><ul>${p.map(x => `<li>${x}</li>`).join('')}</ul></div>
     <button class="btn btn-green" data-close>Entendi</button>`);
-const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div class="ic" style="background:${cor === 'rasp' ? '#fbe8f0' : `var(--${cor}-bg)`};color:${cor === 'rasp' ? '#a8335f' : `var(--${cor})`}">${ic}</div><div><b>${titulo}</b><small>${sub}</small></div></button>`;
+const CORES_OPT = { rasp: ['#fbe8f0', '#a8335f'], teal: ['#e0f3f5', '#086f7b'] };
+const opt = (r, ic, cor, titulo, sub) => `<button class="opt" data-r="${r}"><div class="ic" style="background:${CORES_OPT[cor] ? CORES_OPT[cor][0] : `var(--${cor}-bg)`};color:${CORES_OPT[cor] ? CORES_OPT[cor][1] : `var(--${cor})`}">${ic}</div><div><b>${titulo}</b><small>${sub}</small></div></button>`;
 
 function abrirFinalizar(id){
   const c = byId(id);
@@ -1534,9 +1546,10 @@ function abrirFinalizar(id){
     ${opt('proposta', I.send, 'blue', 'Proposta enviada', 'Vai para Visitas Realizadas')}
     ${opt('contrato', I.doc, 'ok', 'Contrato fechado', 'Vai para Visitas Realizadas e Contratos Fechados')}
     ${opt('recusou', I.x, 'rasp', 'Cliente recusou a proposta', 'Informe o motivo, se souber')}
-    ${opt('outraEmpresa', I.building, 'orange', 'Cliente já atendido por outra empresa', 'Informe qual empresa atende hoje')}
+    ${opt('outraEmpresa', I.building, 'orange', 'Cliente já atendido por outra empresa', 'Obrigatório: nome da empresa, foto e localização')}
     ${opt('fechado', I.cam, 'grey', 'Cliente fechado', 'Obrigatório: foto da fachada')}
-    ${opt('naoExiste', I.pin, 'red', 'Cliente não existe', 'Obrigatório: registrar a localização')}
+    ${opt('naoExiste', I.pin, 'red', 'Cliente não existe', 'Obrigatório: foto e localização')}
+    ${opt('cobranca', I.img, 'teal', 'Cobrança', 'Obrigatório: foto ou print (galeria ou computador)')}
     <button class="btn btn-ghost" data-close>Cancelar</button>`);
   bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const r = b.dataset.r; bg.remove();
@@ -1550,6 +1563,7 @@ function abrirFinalizar(id){
     if (r === 'outraEmpresa') return finalizarOutraEmpresa(id);
     if (r === 'fechado') return finalizarFechado(id);
     if (r === 'naoExiste') return finalizarNaoExiste(id);
+    if (r === 'cobranca') return finalizarCobranca(id);
   });
 }
 
@@ -1567,18 +1581,60 @@ function finalizarRecusou(id, depois){
     if (!depois) return finalizar(id, 'recusou');
     c.resultado = 'recusou'; saveClientes(); toast('Recusa registrada'); irInicio(); };
 }
+// Finalização com provas: nome da empresa (opcional no fluxo), foto(s) e/ou localização obrigatórias
+// cfg: { resultado, titulo, sub, tipoFoto, maxFotos, local, empresa, botaoFoto }
+function finalizarComProvas(id, cfg){
+  const c = byId(id), novas = []; // fotos tiradas nesta janela (descartadas se cancelar)
+  let local = cfg.local ? c.visita.checkin : null, concluido = false;
+  const bg = sheet(`<h3>${cfg.titulo}</h3><p class="sub">${cfg.sub}</p>
+    ${cfg.empresa ? `<label class="f" data-k="emp"><span>Qual empresa atende hoje? <i>*</i></span><input name="emp" value="${esc(c.concorrente || '')}" placeholder="Nome da empresa"><div class="msg">Informe o nome da empresa</div></label>` : ''}
+    <div class="provas" data-provas></div>
+    <div class="fotosFin" data-fotos></div>
+    ${cfg.local ? `<button class="btn btn-soft" data-loc>${I.pinS} Registrar localização</button>` : ''}
+    <button class="btn btn-lime" data-foto>${cfg.botaoFoto}</button>
+    <button class="btn btn-green" data-fim disabled>Finalizar visita</button>
+    <button class="btn btn-ghost" data-close>Cancelar</button>`, async () => {
+      if (concluido) return; // cancelou: descarta as fotos tiradas aqui
+      c.visita.fotos = c.visita.fotos.filter(f => !novas.includes(f.id)); saveClientes();
+      for (const f of novas) { try { await FotoDB.del(f); } catch (e) {} } });
+  const emp = () => cfg.empresa ? bg.querySelector('[name=emp]').value.trim() : 'ok';
+  const desenhar = async () => {
+    const nFotos = novas.length, okFoto = nFotos > 0, okLocal = !cfg.local || !!local;
+    bg.querySelector('[data-provas]').innerHTML =
+      `<div class="prova ${okFoto ? 'ok' : ''}"><i>${okFoto ? '✓' : '📷'}</i>${okFoto ? `${nFotos} foto(s) adicionada(s)` : (cfg.maxFotos > 1 ? 'Foto obrigatória (até ' + cfg.maxFotos + ')' : 'Foto obrigatória')}</div>` +
+      (cfg.local ? `<div class="prova ${okLocal ? 'ok' : ''}"><i>${okLocal ? '✓' : '📍'}</i>${okLocal ? `Localização registrada (±${Math.round(local.acc)} m)` : 'Localização obrigatória'}</div>` : '');
+    const box = bg.querySelector('[data-fotos]'); box.innerHTML = '';
+    for (const fid of novas) { const d = await FotoDB.get(fid); box.insertAdjacentHTML('beforeend', `<div class="ph"><img src="${d}" alt=""></div>`); }
+    const bf = bg.querySelector('[data-foto]'); bf.classList.toggle('hidden', nFotos >= cfg.maxFotos);
+    if (cfg.maxFotos === 1 && nFotos) { bf.classList.remove('hidden'); bf.innerHTML = `${I.cam} Tirar outra foto`; }
+    if (cfg.local) bg.querySelector('[data-loc]').innerHTML = `${I.pinS} ${local ? 'Registrar novamente' : 'Registrar localização'}`;
+    bg.querySelector('[data-fim]').disabled = !(okFoto && okLocal);
+  };
+  if (cfg.local) bg.querySelector('[data-loc]').onclick = () => obterLocalizacao(pos => { local = pos; c.visita.checkin = pos; saveClientes(); desenhar(); });
+  bg.querySelector('[data-foto]').onclick = () => tirarFoto(id, cfg.tipoFoto, async novo => {
+    if (cfg.maxFotos === 1 && novas.length) { const velha = novas.pop(); c.visita.fotos = c.visita.fotos.filter(f => f.id !== velha); saveClientes(); try { await FotoDB.del(velha); } catch (e) {} }
+    novas.push(novo); desenhar();
+  });
+  bg.querySelector('[data-fim]').onclick = () => {
+    if (!emp()) { const f = bg.querySelector('[data-k=emp]'); f.classList.add('bad'); f.scrollIntoView({ block: 'center' }); return; }
+    if (!novas.length || (cfg.local && !local)) return;
+    concluido = true; bg.remove(); finalizar(id, cfg.resultado, cfg.empresa ? { concorrente: emp() } : {});
+  };
+  if (cfg.empresa) bg.querySelector('[name=emp]').addEventListener('input', e => e.target.closest('.f').classList.remove('bad'));
+  desenhar();
+}
 function finalizarOutraEmpresa(id){
-  const c = byId(id);
-  const bg = sheet(`<h3>Atendido por outra empresa</h3><p class="sub">${esc(c.dados.nome)}</p>
-    <form id="fOutra" novalidate>
-      <label class="f" data-k="emp"><span>Qual empresa atende hoje? <i>*</i></span><input name="emp" value="${esc(c.concorrente || '')}" placeholder="Nome da empresa"><div class="msg">Informe o nome da empresa</div></label>
-      <button class="btn btn-green" type="submit">Finalizar visita</button>
-      <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
-    </form>`);
-  const f = bg.querySelector('#fOutra'); setTimeout(() => f.emp.focus(), 100);
-  f.onsubmit = e => { e.preventDefault(); const emp = f.emp.value.trim();
-    if (!emp) return f.querySelector('.f').classList.add('bad');
-    bg.remove(); finalizar(id, 'outraEmpresa', { concorrente: emp }); };
+  finalizarComProvas(id, { resultado: 'outraEmpresa', titulo: 'Atendido por outra empresa', sub: esc(byId(id).dados.nome),
+    tipoFoto: 'outraEmpresa', maxFotos: 1, local: true, empresa: true, botaoFoto: `${I.cam} Tirar foto` });
+}
+function finalizarNaoExiste(id){
+  finalizarComProvas(id, { resultado: 'naoExiste', titulo: 'Cliente não existe', sub: 'Tire uma foto e registre a sua localização no endereço informado.',
+    tipoFoto: 'naoExiste', maxFotos: 1, local: true, botaoFoto: `${I.cam} Tirar foto do local` });
+}
+// Cobrança: única finalização que aceita imagem da galeria do celular ou print do computador
+function finalizarCobranca(id){
+  finalizarComProvas(id, { resultado: 'cobranca', titulo: 'Cobrança', sub: 'Adicione a foto ou o print (da galeria do celular ou do computador).',
+    tipoFoto: 'cobranca', maxFotos: 3, local: false, botaoFoto: `${I.img} Adicionar foto ou print` });
 }
 
 function finalizarFechado(id){
@@ -1601,21 +1657,6 @@ function finalizarFechado(id){
     fid = novo; atualizar();
   });
   bg.querySelector('#btnFechado').onclick = () => { if (!fid) return; bg.remove(); finalizar(id, 'fechado'); };
-}
-
-function finalizarNaoExiste(id){
-  const c = byId(id);
-  const bg = sheet(`<h3>Cliente não existe</h3><p class="sub">Registre a sua localização no endereço informado.</p>
-    <div id="locBox">${c.visita.checkin ? checkinHTML(c.visita) : ''}</div>
-    <button class="btn btn-lime" id="btnLoc" style="margin-top:12px">${I.pinS} ${c.visita.checkin ? 'Registrar novamente' : 'Registrar localização'}</button>
-    <button class="btn btn-green" id="btnNaoExiste" ${c.visita.checkin ? '' : 'disabled'}>Finalizar visita</button>
-    <button class="btn btn-ghost" data-close>Cancelar</button>`);
-  bg.querySelector('#btnLoc').onclick = () => obterLocalizacao(pos => {
-    c.visita.checkin = pos; saveClientes();
-    bg.querySelector('#locBox').innerHTML = checkinHTML(c.visita);
-    bg.querySelector('#btnNaoExiste').disabled = false;
-  });
-  bg.querySelector('#btnNaoExiste').onclick = () => { if (!c.visita.checkin) return; bg.remove(); finalizar(id, 'naoExiste'); };
 }
 
 function finalizar(id, resultado, extra = {}){
@@ -1644,7 +1685,7 @@ function viewClienteRealizado(c){
     : c.resultado === 'proposta' ? `<div class="result proposta">${I.send}<div>Proposta enviada em ${brDate(c.visitadoEm)}</div></div>`
     : c.resultado === 'recusou' ? `<div class="result recusou">${I.x}<div>Cliente recusou a proposta · ${brDate(c.recusadoEm || c.visitadoEm)}
         ${c.motivoRecusa ? `<br><small style="font-weight:500">Motivo: ${esc(c.motivoRecusa)}</small>` : ''}</div></div>`
-    : `<div class="result outros">${c.resultado === 'outraEmpresa' ? I.building : c.resultado === 'fechado' ? I.cam : I.pin}<div>${RESULTADOS[c.resultado].txt} · ${brDate(c.visitadoEm)}
+    : `<div class="result outros">${c.resultado === 'outraEmpresa' ? I.building : c.resultado === 'fechado' ? I.cam : c.resultado === 'cobranca' ? I.img : I.pin}<div>${RESULTADOS[c.resultado].txt} · ${brDate(c.visitadoEm)}
         ${c.resultado === 'outraEmpresa' ? `<br><small style="font-weight:500">Empresa atual: <b>${esc(c.concorrente)}</b></small>` : ''}</div></div>`;
   const completar = c.resultado === 'proposta';
   $('#view').innerHTML = `${res}
