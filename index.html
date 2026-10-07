@@ -356,7 +356,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '21';
+const VERSAO = '22';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -1813,7 +1813,9 @@ function atualizarSituacao(sit){
 }
 // Base zerada pelo gestor: apaga do aparelho tudo o que foi criado antes da data do "zeramento"
 async function aplicarReset(reset){
-  if (!reset || !reset.em) return false;
+  if (!reset || (!reset.em && !reset.vendedor)) return false;
+  // limpeza só do vendedor logado (reset.vendedor) vale apenas para os dados dele; o zeramento geral (reset.em) vale para todos
+  const limiteDe = cpf => { const v = sessao && sessao.cpf === cpf ? reset.vendedor || '' : ''; return v > (reset.em || '') ? v : (reset.em || ''); };
   let users = lsGet(K_USERS, []), saiu = false;
   const apagarChaves = cpf => { try { Object.keys(localStorage).filter(k => k === 'cv_clientes_' + cpf || k === 'cv_sinc_' + cpf || k.indexOf('cv_meta_' + cpf + '_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
   const apagarFotos = lista => lista.forEach(c => ((c.visita || {}).fotos || []).forEach(f => FotoDB.del(f.id).catch(() => {})));
@@ -1824,14 +1826,15 @@ async function aplicarReset(reset){
   }
   users.forEach(u => {
     const ativo = sessao && sessao.cpf === u.cpf && !saiu, lista = ativo ? clientes : lsGet('cv_clientes_' + u.cpf, []);
-    const velhos = lista.filter(c => (c.criadoEm || '') < reset.em); if (!velhos.length) return;
+    const lim = limiteDe(u.cpf); if (!lim) return;
+    const velhos = lista.filter(c => (c.criadoEm || '') < lim); if (!velhos.length) return;
     apagarFotos(velhos);
     const st = lsGet('cv_sinc_' + u.cpf, null);
     if (st) { velhos.forEach(c => { delete (st.cli || {})[c.id]; ((c.visita || {}).fotos || []).forEach(f => delete (st.fotos || {})[f.id]); }); lsSet('cv_sinc_' + u.cpf, st); }
     const novos = lista.filter(c => !velhos.includes(c));
     if (ativo) { clientes.length = 0; novos.forEach(c => clientes.push(c)); }
     lsSet('cv_clientes_' + u.cpf, novos);
-    if (ativo) { location.hash = ''; route(); toast('A base de dados foi reiniciada pelo gestor.'); }
+    if (ativo) { location.hash = ''; route(); toast('Seus dados de teste foram apagados pelo gestor.'); }
   });
   if (saiu) { sair(); $('#loginErr').textContent = 'A base de dados foi reiniciada pelo gestor. Faça o Primeiro acesso novamente.'; }
   return saiu;
