@@ -245,6 +245,12 @@
   .opt .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none}
   .missing{background:var(--red-bg);color:#9b2c2c;border-radius:12px;padding:12px 14px;font-size:14px;margin-bottom:14px}
   .missing ul{margin:6px 0 0;padding-left:18px}
+  .cam{position:fixed;inset:0;background:#000;z-index:42;display:flex;flex-direction:column}
+  .cam video{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+  .cam .bar{display:flex;gap:12px;justify-content:center;align-items:center;padding:16px calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) 16px;background:#111}
+  .cam .bar button{height:52px;padding:0 22px;border-radius:14px;font-weight:700;font-size:16px}
+  .cam .clique{background:var(--lime);color:#18261c;min-width:180px} .cam .sair{background:#333;color:#fff}
+  .cam .aviso-cam{color:#fff;text-align:center;font-size:13px;padding:10px;background:#111}
   .viewer{position:fixed;inset:0;background:#000;z-index:50;display:flex;align-items:center;justify-content:center}
   .viewer img{max-width:100%;max-height:100%}
   .viewer button{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:12px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;display:grid;place-items:center}
@@ -350,7 +356,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '20';
+const VERSAO = '21';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -1201,15 +1207,38 @@ let fotoCtx = null; // { cid, tipo: 'local' | 'fachada' | 'naoExiste' | 'outraEm
 const FOTO_FINAL = { fachada: 'fachada (cliente fechado)', naoExiste: 'cliente não existe', outraEmpresa: 'atendido por outra empresa', cobranca: 'cobrança' };
 const fotoDaVisita = f => !f.tipo || f.tipo === 'local';
 const fotoSoCamera = tipo => tipo === 'fachada' || tipo === 'naoExiste' || tipo === 'outraEmpresa';
+// Celular/tablet: o campo de arquivo com "capture" abre a câmera do aparelho.
+// Computador: o navegador ignora o "capture" e abriria a pasta de arquivos — por isso abrimos a câmera (webcam) dentro do app.
+const ehCelular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
 function tirarFoto(id, tipo = 'local', aoConcluir = null){
   fotoCtx = { cid: id, tipo, aoConcluir };
   const camera = fotoSoCamera(tipo) || (tipo === 'local' && byId(id).visita.modalidade === 'presencial');
+  if (camera && !ehCelular) return cameraNoApp();
   const inp = camera ? $('#fileCamera') : $('#fileGaleria');
   inp.value = ''; inp.click();
 }
-['#fileCamera', '#fileGaleria'].forEach(sel => $(sel).addEventListener('change', e => receberFoto(e, sel === '#fileCamera')));
-async function receberFoto(e, camera){
-  const file = e.target.files[0]; if (!file || !fotoCtx) return;
+async function cameraNoApp(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('Este navegador não abre a câmera. Use o celular para esta foto.');
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
+  catch (e) { return toast(e && e.name === 'NotAllowedError' ? 'Permita o acesso à câmera no navegador para tirar a foto' : 'Nenhuma câmera encontrada neste computador. Use o celular para esta foto.'); }
+  const box = document.createElement('div'); box.className = 'cam';
+  box.innerHTML = `<div class="aviso-cam">Foto obrigatoriamente tirada agora pela câmera (arquivos do computador não são aceitos)</div>
+    <video autoplay playsinline muted></video><div class="bar"><button class="sair" data-sair>Cancelar</button><button class="clique" data-clique>📷 Tirar foto</button></div>`;
+  document.body.appendChild(box);
+  const v = box.querySelector('video'); v.srcObject = stream;
+  const fechar = () => { stream.getTracks().forEach(t => t.stop()); box.remove(); };
+  box.querySelector('[data-sair]').onclick = fechar;
+  box.querySelector('[data-clique]').onclick = () => {
+    if (!v.videoWidth) return;
+    const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight; cv.getContext('2d').drawImage(v, 0, 0);
+    fechar();
+    cv.toBlob(blob => blob && processarFoto(blob, false), 'image/jpeg', 0.92);
+  };
+}
+['#fileCamera', '#fileGaleria'].forEach(sel => $(sel).addEventListener('change', e => { const f = e.target.files[0]; if (f) processarFoto(f, sel === '#fileCamera'); }));
+async function processarFoto(file, camera){
+  if (!file || !fotoCtx) return;
   const ctx = fotoCtx, c = byId(ctx.cid);
   if (ctx.tipo === 'local' && c.visita.fotos.filter(fotoDaVisita).length >= 3) return;
   // Segunda trava da visita presencial: foto recém-tirada tem data de agora; foto antiga da galeria é recusada
