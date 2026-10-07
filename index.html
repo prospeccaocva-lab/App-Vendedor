@@ -356,7 +356,7 @@
 /* =========================================================
    CONFIGURAÇÕES
    ========================================================= */
-const VERSAO = '22';
+const VERSAO = '24';
 
 // Integração com o Google (planilha + Gmail + Drive) via Google Apps Script.
 // url: link do "App da Web" gerado ao implantar o script (termina em /exec).
@@ -834,7 +834,7 @@ function clienteCard(c){
   if (R) { tag = `<span class="tag ${R.tag}">${R.txt}</span>`; cls = R.cls; }
   return `<button class="ccard ${cls}" onclick="location.hash='cliente/${c.id}'">
     <div class="row"><span class="nm">${esc(d.nome)}</span>${tag}</div>
-    <div class="ln">${I.pinS}<span>${esc(d.endereco)}, ${esc(d.numero)} – ${esc(d.bairro)}, ${esc(cidadeUF(d))}</span></div>
+    <div class="ln">${I.pinS}<span>${esc([[d.endereco, d.numero].filter(Boolean).join(', '), d.bairro, cidadeUF(d)].filter(Boolean).join(' – '))}</span></div>
     <div class="ln">${I.phoneS}<span>${esc(d.telefone)}</span></div>
   </button>`;
 }
@@ -963,7 +963,7 @@ function dadosHTML(c, editavel){
     <dl class="kv">
       <dt>Nome</dt><dd><b>${esc(d.nome)}</b></dd>
       ${d.doc ? `<dt>CPF/CNPJ</dt><dd>${esc(d.doc)}</dd>` : ''}
-      <dt>Endereço</dt><dd>${esc(d.endereco)}, ${esc(d.numero)}<br>${esc(d.bairro)} – ${esc(cidadeUF(d))}</dd>
+      <dt>Endereço</dt><dd>${esc([d.endereco, d.numero].filter(Boolean).join(', '))}<br>${esc([d.bairro, cidadeUF(d)].filter(Boolean).join(' – '))}</dd>
       <dt>Telefone</dt><dd><a href="tel:${digits(d.telefone)}">${esc(d.telefone)}</a></dd>
       <dt>E-mail</dt><dd><a href="mailto:${esc(d.email)}">${esc(d.email)}</a></dd>
     </dl></div>`;
@@ -1207,12 +1207,14 @@ let fotoCtx = null; // { cid, tipo: 'local' | 'fachada' | 'naoExiste' | 'outraEm
 const FOTO_FINAL = { fachada: 'fachada (cliente fechado)', naoExiste: 'cliente não existe', outraEmpresa: 'atendido por outra empresa', cobranca: 'cobrança' };
 const fotoDaVisita = f => !f.tipo || f.tipo === 'local';
 const fotoSoCamera = tipo => tipo === 'fachada' || tipo === 'naoExiste' || tipo === 'outraEmpresa';
+// Foto da visita e da cobrança: na visita presencial só pela câmera; na virtual (ou sem modalidade, no caso da cobrança) aceita galeria/computador
+const exigeCamera = (tipo, c) => fotoSoCamera(tipo) || ((tipo === 'local' || tipo === 'cobranca') && c.visita.modalidade === 'presencial');
 // Celular/tablet: o campo de arquivo com "capture" abre a câmera do aparelho.
 // Computador: o navegador ignora o "capture" e abriria a pasta de arquivos — por isso abrimos a câmera (webcam) dentro do app.
 const ehCelular = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
 function tirarFoto(id, tipo = 'local', aoConcluir = null){
   fotoCtx = { cid: id, tipo, aoConcluir };
-  const camera = fotoSoCamera(tipo) || (tipo === 'local' && byId(id).visita.modalidade === 'presencial');
+  const camera = exigeCamera(tipo, byId(id));
   if (camera && !ehCelular) return cameraNoApp();
   const inp = camera ? $('#fileCamera') : $('#fileGaleria');
   inp.value = ''; inp.click();
@@ -1277,7 +1279,7 @@ async function carimbarFoto(file, quando, c, tipo = 'local'){
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const g = cv.getContext('2d'); g.drawImage(img, 0, 0, w, h);
   const fs = Math.max(18, Math.round(w * 0.032)), padd = Math.round(fs * 0.7);
-  const pres = fotoSoCamera(tipo) || (tipo === 'local' && c.visita.modalidade === 'presencial');
+  const pres = exigeCamera(tipo, c);
   const linhas = [pres ? brDateTime(quando) : 'Anexado em ' + brDateTime(quando).slice(0, 16),
     FOTO_FINAL[tipo] ? c.dados.nome + ' · ' + FOTO_FINAL[tipo] : pres ? c.dados.nome : c.dados.nome + ' · visita virtual'];
   const k = c.visita.checkin; if (pres && k) linhas.push(`${k.lat.toFixed(5)}, ${k.lng.toFixed(5)}`);
@@ -1578,7 +1580,7 @@ function abrirFinalizar(id){
     ${opt('outraEmpresa', I.building, 'orange', 'Cliente já atendido por outra empresa', 'Obrigatório: nome da empresa, foto e localização')}
     ${opt('fechado', I.cam, 'grey', 'Cliente fechado', 'Obrigatório: foto da fachada')}
     ${opt('naoExiste', I.pin, 'red', 'Cliente não existe', 'Obrigatório: foto e localização')}
-    ${opt('cobranca', I.img, 'teal', 'Cobrança', 'Obrigatório: foto ou print (galeria ou computador)')}
+    ${opt('cobranca', I.img, 'teal', 'Cobrança', c.visita.modalidade === 'presencial' ? 'Obrigatório: foto pela câmera' : 'Obrigatório: foto ou print (galeria ou computador)')}
     <button class="btn btn-ghost" data-close>Cancelar</button>`);
   bg.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
     const r = b.dataset.r; bg.remove();
@@ -1662,8 +1664,10 @@ function finalizarNaoExiste(id){
 }
 // Cobrança: única finalização que aceita imagem da galeria do celular ou print do computador
 function finalizarCobranca(id){
-  finalizarComProvas(id, { resultado: 'cobranca', titulo: 'Cobrança', sub: 'Adicione a foto ou o print (da galeria do celular ou do computador).',
-    tipoFoto: 'cobranca', maxFotos: 3, local: false, botaoFoto: `${I.img} Adicionar foto ou print` });
+  const pres = byId(id).visita.modalidade === 'presencial'; // presencial: só câmera · virtual: galeria do celular ou print do computador
+  finalizarComProvas(id, { resultado: 'cobranca', titulo: 'Cobrança',
+    sub: pres ? 'Visita presencial: tire a foto agora pela câmera.' : 'Adicione a foto ou o print (da galeria do celular ou do computador).',
+    tipoFoto: 'cobranca', maxFotos: 3, local: false, botaoFoto: pres ? `${I.cam} Tirar foto` : `${I.img} Adicionar foto ou print` });
 }
 
 function finalizarFechado(id){
@@ -1815,7 +1819,8 @@ function atualizarSituacao(sit){
 async function aplicarReset(reset){
   if (!reset || (!reset.em && !reset.vendedor)) return false;
   // limpeza só do vendedor logado (reset.vendedor) vale apenas para os dados dele; o zeramento geral (reset.em) vale para todos
-  const limiteDe = cpf => { const v = sessao && sessao.cpf === cpf ? reset.vendedor || '' : ''; return v > (reset.em || '') ? v : (reset.em || ''); };
+  const geral = reset.geral !== undefined ? reset.geral : (reset.em || '');
+  const limiteDe = cpf => { if (!(sessao && sessao.cpf === cpf)) return geral; const v = reset.vendedor || '', e = reset.em || ''; return v > e ? v : e; };
   let users = lsGet(K_USERS, []), saiu = false;
   const apagarChaves = cpf => { try { Object.keys(localStorage).filter(k => k === 'cv_clientes_' + cpf || k === 'cv_sinc_' + cpf || k.indexOf('cv_meta_' + cpf + '_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {} };
   const apagarFotos = lista => lista.forEach(c => ((c.visita || {}).fotos || []).forEach(f => FotoDB.del(f.id).catch(() => {})));
@@ -1899,7 +1904,7 @@ async function restaurarClientes(u){
   const locais = ativo ? clientes : lsGet(k, []), st = lsGet(ks, { vend: null, cli: {}, fotos: {} });
   st.cli = st.cli || {}; st.fotos = st.fotos || {};
   if (!locais.length) st.bk = 1; // aparelho novo: tudo veio do Google, não precisa reenviar
-  let mudou = 0;
+  let mudou = 0, novosRecebidos = 0;
   for (const sc of (r.clientes || [])) {
     if (!sc || !sc.id || !sc.dados) continue;
     sc.visita = sc.visita || {}; sc.visita.fotos = sc.visita.fotos || [];
@@ -1909,7 +1914,7 @@ async function restaurarClientes(u){
       if (hl === hs) { st.cli[sc.id] = hs; continue; }
       if (st.cli[l.id] !== hl) continue; // tem alteração deste aparelho ainda não enviada
       Object.keys(l).forEach(x => delete l[x]); Object.assign(l, sc);
-    } else locais.push(sc);
+    } else { locais.push(sc); novosRecebidos++; }
     st.cli[sc.id] = hs; sc.visita.fotos.forEach(f => { if (!st.fotos[f.id]) st.fotos[f.id] = true; }); // fotos já estão no Drive
     mudou++;
   }
@@ -1918,7 +1923,7 @@ async function restaurarClientes(u){
   lsSet(k, locais);
   if (sessao && sessao.cpf === u.cpf) { const r = location.hash.replace('#', '').split('/')[0];
     if (['', 'visitar', 'realizadas', 'contratos'].includes(r) && !document.querySelector('.sheet-bg, .viewer')) { const y = window.scrollY; route(); window.scrollTo(0, y); } // não mexe em tela com formulário aberto
-    toast(mudou + (mudou > 1 ? ' clientes atualizados' : ' cliente atualizado') + ' do Google'); }
+    toast(novosRecebidos ? `${novosRecebidos} ${novosRecebidos > 1 ? 'novos clientes' : 'novo cliente'} em "Clientes para Visitar"` : mudou + (mudou > 1 ? ' clientes atualizados' : ' cliente atualizado') + ' do Google'); }
 }
 
 async function sincronizar(){
@@ -1970,7 +1975,16 @@ async function buscarMeta(){
   } catch (e) {}
 }
 window.addEventListener('online', () => { sincronizar(); buscarMeta(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { sincronizar(); buscarMeta(); } });
+// App aberto em segundo plano por dias (comum no celular): ao voltar para ele, confere de novo o Google
+// (limpeza feita pelo gestor, dados de outro aparelho) antes de enviar
+let ultimaVerificacao = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !sessao) return;
+  buscarMeta();
+  if (Date.now() - ultimaVerificacao < 60000) return sincronizar();
+  ultimaVerificacao = Date.now();
+  consultarSituacao().catch(() => {}).then(() => sessao && restaurarClientes(usuarioAtual())).catch(() => {}).then(() => sessao && sincronizar());
+});
 
 /* =========================================================
    INÍCIO
